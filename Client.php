@@ -123,14 +123,14 @@ class Client {
         $this->ssl = $ssl;
     }
 
-    function setPlugin(Octopuce\Acme\PluginInterface $plugin) {
-        $this->plugins[$plugin::type] = $plugin;
+    function setPlugin(Octopuce\Acme\ValidationPluginInterface $plugin) {
+        $this->plugins[$plugin->getType()] = $plugin;
     }
 
     /** Enumerate the API functions from a starting point
      * store them into the storage, store Nonce too 
      * you can call this one anytime, this allows you to get a new nonce too 
-     * @param boolean $nosave used intenally (don't save status, only get nonce)
+     * @param boolean $nosave used internally (don't save status, only get nonce)
      * @return array return the 4 urls as a hash
      */
     function enumApi(boolean $nosave = false) {
@@ -261,23 +261,58 @@ class Client {
         }
         $this->checkFqdn($resource["value"]); // may throw Exception
         // now call the API to prepare the AUTHZ
-        list($headers, $content) = $this->stdCall("new-authz", $resource);
+        $httpcall = $this->stdCall("new-authz", $resource);
+        return $this->saveAuthz($httpcall);
+    }
+
+    /**
+     * Return information of an existing Authz
+     * @param integer $id the authz number in the storage
+     * @param boolean $update Shall we update from the ACME Server?
+     * @return array the values of the authz
+     */
+    public function getAuthz(integer $id, boolean $update = false) {
+        $me = $this->db->getAuthz($id);
+        if (!$me) {
+            throw new AcmeException(13, "Error Authz not found");
+        }
+        if ($update) {
+            $httpcall = $this->http->get($me["url"]);
+            return $this->saveAuthz($httpcall, $id);
+        }
+        return $me;
+    }
+
+    /**
+     * Save an Authz object from the httpcall of it (either at new-authz time 
+     * or when getting up-to-date information about it
+     * @param array $httpcall the two element array with headers and content
+     * received from http call
+     * @param integer $id the authz-id (non mandatory)
+     * @return array the entire authz information including challenges and id
+     * @throws AcmeException
+     */
+    private function saveAuthz(array $httpcall, integer $id = null) {
+        list($headers, $content) = $httpcall;
         if (isset($headers["HTTP"])) {
             if ($headers["HTTP"][0] != "200") {
                 throw new AcmeException(2, "Error " . $headers["HTTP"][0] . " when calling the API");
             }
         }
         if (!isset($headers["Location"])) {
-            throw new AcmeException(3, "Can't call newAuthz, unexpected result (missing location header)");
+            throw new AcmeException(3, "Can't get Authz, unexpected result (missing location header)");
         }
         if (!isset($content["challenges"])) {
-            throw new AcmeException(3, "Can't call newAuthz, unexpected result (missing challenges)");
+            throw new AcmeException(3, "Can't get Authz, unexpected result (missing challenges)");
         }
-        $authz = array("type" => $resource["type"],
-            "value" => $resource["value"],
+        $authz = array("type" => $content["type"],
+            "value" => $content["value"],
             "url" => $headers["Location"][0],
             "challenges" => $content["challenges"]
         );
+        if (!isnull($id)) {
+            $authz["id"] = $id;
+        }
         // store it along with contact information
         $id = $this->db->setAuthz($authz);
         $authz["id"] = $id;
@@ -353,9 +388,53 @@ class Client {
         // Generate a proper CSR / KEY 
         $key = $this->ssl->genRsa();
         $csr = $this->ssl->genCsr($key, $fqdn, $altNames);
-        $dercsr=$this->ssl->pemToDer($csr);
+        $dercsr = $this->ssl->pemToDer($csr);
         $resource['csr'] = JOSE_URLSafeBase64::encode($dercsr);
         list($headers, $content) = $this->stdCall("new-cert", $resource);
+        if (isset($headers["HTTP"])) {
+            if ($headers["HTTP"][0] != "200") {
+                throw new AcmeException(2, "Error " . $headers["HTTP"][0] . " when calling the API");
+            }
+        }
+        // FIXME WHAT DO I GET BACK ??
+        $cert = array("key" => $key,
+            "csr" => $csr,
+            "crt" => $content["crt"],
+            "chain" => $content["chain"]
+        );
+        // store it along with contact information
+        $id = $this->db->setCert($cert);
+        $cert["id"] = $id;
+        return $cert;
+    }
+
+    /**
+     * Return information of an existing Certificate
+     * @param integer $id the cert number in the storage
+     * @return array the values of the cert
+     */
+    public function getCert(integer $id) {
+        $me = $this->db->getCert($id);
+        if (!$me) {
+            throw new AcmeException(12, "Error Certificate not found");
+        }
+        return $me;
+    }
+
+    /**
+     * request a certificate recovation for a domain name 
+     * by calling revoke-cert acme api endpoint.
+     * YOU MUST have called newReg or getReg before that (on the same session)
+     * to choose which account to use
+     * @param integer $id the certificate-id to request revocation for
+     * @return array an hash containing all cert informations, including an ID from the Storage, key,csr,crt,chain as PEM strings
+     * @throws AcmeException
+     */
+    function revokeCert(integer $id) {
+        $cert=$this->getCert($id);
+        // TODO : CODE THIS, NOT CODED YET
+        $resource=array("fqdn" => $cert("fqdn"));
+        list($headers, $content) = $this->stdCall("revoke-cert", $resource);
         if (isset($headers["HTTP"])) {
             if ($headers["HTTP"][0] != "200") {
                 throw new AcmeException(2, "Error " . $headers["HTTP"][0] . " when calling the API");
@@ -437,8 +516,8 @@ class Client {
                 !$status["nonce"] ||
                 $status["noncets"] < (time() - self::NONCE_MAX_AGE)
         ) {
-            // generate a new nonce
-            $this->enumApi();
+            // generate a new nonce, no need to save it => we consume it right now
+            $this->enumApi(true);
         } else {
             // or use the current and mark it as used
             $this->nonce = $status["nonce"];

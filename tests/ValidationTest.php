@@ -9,10 +9,11 @@
 namespace Octopuce\Acme;
 
 /**
- * Acme HTTP GET/POST calls interface
+ * Acme Challenge installer/removal scripts, 
+ * that should usually be adapted to your bind/apache/nginx ... configuration
  * @author benjamin
  */
-interface ValidationPlugin {
+class ValidationTest implements ValidationPluginInterface {
 
     /**
      * Install a validator by giving it the necessary data 
@@ -20,18 +21,24 @@ interface ValidationPlugin {
      * @param string $fqdn
      * @param mixed $data
      */
-    function installValidator($fqdn, $data);
+    function installValidator($fqdn, $data) {
+        
+    }
 
     /**
      * Remove a previously installed validator 
      * @param string $fqdn
      * @param mixed $data
      */
-    function removeValidator($fqdn, $data);
+    function removeValidator($fqdn, $data) {
+        
+    }
 
     /**
      * Return the supported type of the validator class
      * @return string type of the validator (DVSNI DNS HttpSimple ...)
      */
-    function getType();
+    function getType() {
+        return "simpleHttp";
+    }
 }

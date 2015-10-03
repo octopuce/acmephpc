@@ -16,12 +16,6 @@ class StoragePdo extends PDO implements StorageInterface {
 
     private $prefix = "acme_";
 
-    /** Initialize the PDO access
-     */
-    public function __construct() {
-        
-    }
-
     /**
      * save the status of the API, this includes
      * the nonce (+ the current date of it)
@@ -80,7 +74,7 @@ class StoragePdo extends PDO implements StorageInterface {
      * @return array the contact informations
      */
     public function getContact($id) {
-        return $this->autoGet("contact", array("privatekey", "publickey", "contract"), array("contact"));
+        return $this->autoGet("contact", $id, array("privatekey", "publickey", "contract"), array("contact"));
     }
 
     /**
@@ -91,7 +85,7 @@ class StoragePdo extends PDO implements StorageInterface {
      * @return integer the authz id
      */
     public function setAuthz($data) {
-        return $this->autoSet("authz", $data, array("type", "value"), array("challenges"));
+        return $this->autoSet("authz", $data, array("type", "value", "url"), array("challenges"));
     }
 
     /**
@@ -101,7 +95,7 @@ class StoragePdo extends PDO implements StorageInterface {
      * @return array the authz informations
      */
     public function getAuthz($id) {
-        return $this->autoGet("authz", $data, array("type", "value"), array("challenges"));
+        return $this->autoGet("authz", $id, array("type", "value", "url"), array("challenges"));
     }
 
     /**
@@ -112,7 +106,7 @@ class StoragePdo extends PDO implements StorageInterface {
      * @return integer the certificate id
      */
     public function setCert($data) {
-        return $this->autoSet("cert", $data, array("fqdn","privatekey","certificate","chain","validfrom","validuntil","status"), array("altnames"));
+        return $this->autoSet("cert", $data, array("fqdn", "privatekey", "certificate", "chain", "validfrom", "validuntil", "status"), array("altnames"));
     }
 
     /**
@@ -122,7 +116,7 @@ class StoragePdo extends PDO implements StorageInterface {
      * @return array the certificate informations
      */
     public function getCert($id) {
-        return $this->autoGet("cert", $id, array("fqdn","privatekey","certificate","chain","validfrom","validuntil","status"), array("altnames"));
+        return $this->autoGet("cert", $id, array("fqdn", "privatekey", "certificate", "chain", "validfrom", "validuntil", "status"), array("altnames"));
     }
 
     /**
