@@ -12,8 +12,13 @@ namespace Octopuce\Acme\Test;
  * Acme dummy storage interface for library's tests
  * @author benjamin
  */
-class StorageTest implements StorageInterface {
+class StorageTest extends PDO implements StorageInterface {
 
+    function __construct($filename) {
+        // open the sqlite file
+        parent::__construct();
+    }
+    
     /**
      * save the status of the API, this includes
      * the nonce (+ the current date of it)
