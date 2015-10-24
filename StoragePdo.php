@@ -12,9 +12,14 @@ namespace Octopuce\Acme;
  * Acme DB PDO and SQL based storage interface
  * @author benjamin
  */
-class StoragePdo extends PDO implements StorageInterface {
+class StoragePdo extends \PDO implements StorageInterface {
 
     private $prefix = "acme_";
+
+    public function __construct($dsn, $username = null, $password = null, $options = array()) {
+        // TODO: ensure we trigger *exceptions* when something goes wrong
+        parent::__construct($dsn, $username, $password, $options);
+    }
 
     /**
      * save the status of the API, this includes
@@ -27,19 +32,19 @@ class StoragePdo extends PDO implements StorageInterface {
         $sql = "";
         $params = array();
         if (isset($data["nonce"])) {
-            $sql.="nonce=?";
+            $sql.=", nonce=?";
             $params[] = $data["nonce"];
         }
         if (isset($data["noncets"])) {
-            $sql.="noncets=?";
+            $sql.=", noncets=?";
             $params[] = $data["noncets"];
         }
         if (isset($data["apiurl"])) {
-            $sql.="apiurls=?";
+            $sql.=", apiurls=?";
             $params[] = json_encode($data["apiurl"]);
         }
-        $this->prepare("UPDATE " . $this->prefix . "status SET modified=NOW() " . $sql);
-        return $this->execute($params);
+        $stmt = $this->prepare("UPDATE " . $this->prefix . "status SET modified=NOW() " . $sql);
+        return $stmt->execute($params);
     }
 
     /**
@@ -49,7 +54,7 @@ class StoragePdo extends PDO implements StorageInterface {
      */
     public function getStatus() {
         $res = $this->query("SELECT * FROM " . $this->prefix . "status;");
-        $obj = $res->fetch(PDO::FETCH_ASSOC);
+        $obj = $res->fetch(\PDO::FETCH_ASSOC);
         $obj["apiurl"] = json_decode($obj["apiurls"], true);
         unset($obj["apiurls"]);
         return $obj;
@@ -63,7 +68,7 @@ class StoragePdo extends PDO implements StorageInterface {
      * @return integer the contact id
      */
     public function setContact($data) {
-        return $this->autoSet("contact", $data, array("privatekey", "publickey", "contract"), array("contact"));
+        return $this->autoSet("contact", $data, array("privatekey", "publickey", "contract", "status", "url"), array("contact"));
     }
 
     /**
@@ -74,7 +79,7 @@ class StoragePdo extends PDO implements StorageInterface {
      * @return array the contact informations
      */
     public function getContact($id) {
-        return $this->autoGet("contact", $id, array("privatekey", "publickey", "contract"), array("contact"));
+        return $this->autoGet("contact", $id, array("privatekey", "publickey", "contract", "status", "url"), array("contact"));
     }
 
     /**
@@ -143,7 +148,7 @@ class StoragePdo extends PDO implements StorageInterface {
      * @param array $arrays the list of json_encoded fields 
      * @return boolean true if the request executed successfully
      */
-    private function autoSet(string $table, array $data, array $fields, array $arrays) {
+    private function autoSet($table, $data, $fields, $arrays) {
         $sql = "";
         $params = array();
         foreach ($fields as $field) {
@@ -159,13 +164,21 @@ class StoragePdo extends PDO implements StorageInterface {
             }
         }
         if (isset($data["id"])) {
-            $sql = "INSERT INTO " . $this->prefix . $table . " SET created=UNIX_TIMESTAMP(NOW()), modified=UNIX_TIMESTAMP(NOW()) " . $sql;
-        } else {
             $sql = "UPDATE " . $this->prefix . $table . " SET modified=UNIX_TIMESTAMP(NOW()) " . $sql . " WHERE id=?";
             $params[] = $data["id"];
+        } else {
+            $sql = "INSERT INTO " . $this->prefix . $table . " SET created=UNIX_TIMESTAMP(NOW()), modified=UNIX_TIMESTAMP(NOW()) " . $sql;
         }
-        $this->prepare($sql);
-        return $this->execute($params);
+        $stmt = $this->prepare($sql);
+        if ($stmt->execute($params)) {
+            if (isset($data["id"])) {
+                return $data["id"];
+            } else {
+                return $this->lastInsertId(); // TODO: not compatible with sqlite or pgsql ??
+            }
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -177,7 +190,7 @@ class StoragePdo extends PDO implements StorageInterface {
      * @param array $arrays the list of json_encoded fields 
      * @return array containing the found data (or false)
      */
-    private function autoGet(string $table, integer $id, array $fields, array $arrays) {
+    private function autoGet($table, $id, $fields, $arrays) {
         $sql = "";
         $params = array();
         foreach ($fields as $field) {
@@ -198,8 +211,8 @@ class StoragePdo extends PDO implements StorageInterface {
             $sql = "UPDATE " . $this->prefix . $table . " SET modified=UNIX_TIMESTAMP(NOW()) " . $sql . " WHERE id=?";
             $params[] = $data["id"];
         }
-        $this->prepare($sql);
-        return $this->execute($params);
+        $stmt = $this->prepare($sql);
+        return $stmt->execute($params);
     }
 
 }

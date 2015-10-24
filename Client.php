@@ -8,7 +8,8 @@
 
 namespace Octopuce\Acme;
 
-use JOSE_JWK;
+use \JOSE;
+use \phpseclib\Crypt\RSA;
 
 /**
  * Main ACME Client Library
@@ -110,9 +111,9 @@ class Client {
      * @param \Psr\Log\LoggerInterface $log
      * @param \Octopuce\Acme\SslInterface $ssl
      */
-    function __construct(string $apiroot = null, StorageInterface $db = null, HttpClientInterface $http = null, \Psr\Log\LoggerInterface $log = null, SslInterface $ssl = null) {
+    function __construct($apiroot = null, StorageInterface $db = null, HttpClientInterface $http = null, \Psr\Log\LoggerInterface $log = null, SslInterface $ssl = null) {
         if (is_null($apiroot)) {
-            $this->api = "https://acme-staging.api.letsencrypt.org";
+            $this->api = "https://acme-v01.api.letsencrypt.org";
         } else {
             $this->api = rtrim($apiroot, "/");
         }
@@ -133,7 +134,7 @@ class Client {
      * @param boolean $nosave used internally (don't save status, only get nonce)
      * @return array return the 4 urls as a hash
      */
-    function enumApi(boolean $nosave = false) {
+    function enumApi($nosave = false) {
         $endpoints = array("new-authz", "new-cert", "new-reg", "revoke-cert");
         list($h, $c) = $this->http->get($this->api . "/directory");
         $status = array();
@@ -172,23 +173,24 @@ class Client {
     function newReg(array $contact) {
         $contactApi = array();
         foreach ($contact as $key => $val) {
-            if (!in_array($key, $this->contactFields)) {
+            if (!in_array($key, $this->contactFields, true)) {
                 throw new AcmeException();
             }
             $contactApi[] = $key . ":" . $val;
         }
 
         $this->userKey = $this->ssl->genRsa();
-        $contact["publickey"] = $this->userKey["publickey"];
-        $contact["privatekey"] = $this->userKey["privatekey"];
-        $contact["status"] = self::CONTACT_STATUS_PENDING;
+        $reg["publickey"] = $this->userKey["publickey"];
+        $reg["privatekey"] = $this->userKey["privatekey"];
+        $reg["status"] = self::CONTACT_STATUS_PENDING;
+        $reg["contact"] = json_encode($contactApi);
         // store it along with contact information
-        $id = $this->db->setContact($contact);
+        $id = $this->db->setContact($reg);
 
         // now call the API to register this account
         list($headers, ) = $this->stdCall("new-reg", array("contact" => $contactApi));
         if (isset($headers["HTTP"])) {
-            if ($headers["HTTP"][0] != "200") {
+            if ($headers["HTTP"][1] != "201") {
                 throw new AcmeException(2, "Error " . $headers["HTTP"][0] . " when calling the API");
             }
         }
@@ -201,15 +203,26 @@ class Client {
         // store it along with contact information
         $this->db->setContact($registered);
 
-        if (isset($headers["Link"]) &&
-                $link = $this->extractLink($headers["Link"][0])
-        ) {
-            // try to sign any contract *right now* 
-            list($headers, ) = $this->stdCall($headers["Location"][0], array('agreement' => $link[0]));
-            if (isset($headers["HTTP"]) &&
-                    $headers["HTTP"][0] == "200") {
-                $contracted = array("id" => $id, "status" => self::CONTACT_STATUS_CONTRACTED);
-                $this->db->setContact($contracted);
+        if (isset($headers["Link"])) {
+            $tos = "";
+            foreach ($headers["Link"] as $link) {
+                $onelink = $this->extractLink($link);
+                if ($onelink[1] == "terms-of-service") {
+                    $tos = $onelink[0];
+                }
+            }
+            if ($tos) {
+                // try to sign any contract *right now* 
+                list($headers, ) = $this->stdCall($headers["Location"][0], array('agreement' => $tos, 'contact' => $contactApi), "reg");
+                if (isset($headers["HTTP"]) &&
+                        $headers["HTTP"][1] == "202") {
+                    $contracted = array("id" => $id, "status" => self::CONTACT_STATUS_CONTRACTED, "contract" => $tos);
+                    $this->db->setContact($contracted);
+                } else {
+                    // TODO: what shall we do if new-reg is OKAY but we couldn't sign the contract ?
+                }
+            } else {
+                // TODO: what if there is NOT TOS to sign??
             }
         }
         return $id;
@@ -227,7 +240,7 @@ class Client {
      * @param boolean $privatekeytoo shall we return the private key too?
      * @return array the values of the account
      */
-    public function getReg(integer $id, boolean $privatekeytoo = false) {
+    public function getReg($id, $privatekeytoo = false) {
         $me = $this->db->getContact($id);
         if (!$me) {
             return false;
@@ -271,7 +284,7 @@ class Client {
      * @param boolean $update Shall we update from the ACME Server?
      * @return array the values of the authz
      */
-    public function getAuthz(integer $id, boolean $update = false) {
+    public function getAuthz($id, $update = false) {
         $me = $this->db->getAuthz($id);
         if (!$me) {
             throw new AcmeException(13, "Error Authz not found");
@@ -431,9 +444,9 @@ class Client {
      * @throws AcmeException
      */
     function revokeCert(integer $id) {
-        $cert=$this->getCert($id);
+        $cert = $this->getCert($id);
         // TODO : CODE THIS, NOT CODED YET
-        $resource=array("fqdn" => $cert("fqdn"));
+        $resource = array("fqdn" => $cert("fqdn"));
         list($headers, $content) = $this->stdCall("revoke-cert", $resource);
         if (isset($headers["HTTP"])) {
             if ($headers["HTTP"][0] != "200") {
@@ -467,23 +480,34 @@ class Client {
      * @param array $params list of key=>value to sent as a json object or array.
      * @return array the api call result (header + decoded content)
      */
-    private function stdCall(string $api, array $params) {
+    private function stdCall($api, $params, $resource = null) {
         $this->init();
 
-        // prepare the JWS 
-        $jwk = JOSE_JWK::encode($this->userKey["publickey"]);
-        $jwt = new JOSE_JWT($params);
+        $public_key = new RSA();
+        $public_key->loadKey($this->userKey["publickey"]);
+        $jwk = \JOSE_JWK::encode($public_key); // => JOSE_JWK instance
+
+        if (substr($api, 0, 4) == "http") {
+            $url = $api;
+            if (is_null($resource)) {
+                throw new AcmeException(14, "stdCall with URL api MUST include resource name");
+            }
+        } else {
+            $url = $this->apiUrl[$api];
+            if (is_null($resource)) {
+                $resource = $api;
+            }
+        }
+        $params["resource"] = $resource;
+
+        $jwt = new \JOSE_JWT($params);
 
         $jwt->header['jwk'] = $jwk->components;
         $jwt->header['nonce'] = $this->nonce;
 
         $jws = $jwt->sign($this->userKey["privatekey"], 'RS512');
 
-        if (substr($api, 0, 4) == "http") {
-            $url = $api;
-        } else {
-            $url = $this->apiUrl[$api];
-        }
+
         // call the API
         $httpResult = $this->http->post($url, $jws->toJson());
         // save the new Nonce

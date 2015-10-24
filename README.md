@@ -36,3 +36,4 @@ and
 >> see if the API/RFC tells which answer the CA/ACME Server should reply when doing those 
 "same domain" or "already revoked" calls.
 
+>> manage status of Authz, Challenges ? & Certs 
