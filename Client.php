@@ -308,7 +308,7 @@ class Client {
     private function saveAuthz(array $httpcall, integer $id = null) {
         list($headers, $content) = $httpcall;
         if (isset($headers["HTTP"])) {
-            if ($headers["HTTP"][0] != "200") {
+            if ($headers["HTTP"][1] != "200") {
                 throw new AcmeException(2, "Error " . $headers["HTTP"][0] . " when calling the API");
             }
         }
@@ -378,7 +378,7 @@ class Client {
                     break;
             }
             // call for this challenge 
-            $this->stdCall($challenge["uri"], $resource);
+            $this->stdCall($challenge["uri"], $resource, "challenge");
             // what do I get back ?
         }
         return $authz;
@@ -405,8 +405,8 @@ class Client {
         $resource['csr'] = JOSE_URLSafeBase64::encode($dercsr);
         list($headers, $content) = $this->stdCall("new-cert", $resource);
         if (isset($headers["HTTP"])) {
-            if ($headers["HTTP"][0] != "200") {
-                throw new AcmeException(2, "Error " . $headers["HTTP"][0] . " when calling the API");
+            if ($headers["HTTP"][1] != "200") {
+                throw new AcmeException(2, "Error " . $headers["HTTP"][1] . " when calling the API");
             }
         }
         // FIXME WHAT DO I GET BACK ??
@@ -449,8 +449,8 @@ class Client {
         $resource = array("fqdn" => $cert("fqdn"));
         list($headers, $content) = $this->stdCall("revoke-cert", $resource);
         if (isset($headers["HTTP"])) {
-            if ($headers["HTTP"][0] != "200") {
-                throw new AcmeException(2, "Error " . $headers["HTTP"][0] . " when calling the API");
+            if ($headers["HTTP"][1] != "200") {
+                throw new AcmeException(2, "Error " . $headers["HTTP"][1] . " when calling the API");
             }
         }
         // FIXME WHAT DO I GET BACK ??

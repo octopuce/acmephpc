@@ -174,7 +174,7 @@ class StoragePdo extends \PDO implements StorageInterface {
             if (isset($data["id"])) {
                 return $data["id"];
             } else {
-                return $this->lastInsertId(); // TODO: not compatible with sqlite or pgsql ??
+                return $this->lastInsertId(); // TODO: not compatible with sqlite or pgsql  
             }
         } else {
             return false;
@@ -182,8 +182,8 @@ class StoragePdo extends \PDO implements StorageInterface {
     }
 
     /**
-     * Get record in $table whose fields are $fields
-     * also get arrays from $arrays as json_encoded data
+     * Get record in $table for id $id.
+     * get $fields and get arrays from $arrays as json_encoded data
      * @param string $table the table name
      * @param array $id the it to search for 
      * @param array $fields the list of standard fields 
@@ -191,28 +191,26 @@ class StoragePdo extends \PDO implements StorageInterface {
      * @return array containing the found data (or false)
      */
     private function autoGet($table, $id, $fields, $arrays) {
-        $sql = "";
-        $params = array();
+        $sql = "SELECT * FROM " . $this->prefix . $table . " WHERE id=?";
+        $res = $this->query($sql, array($id));
+        $data = $res->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$data) {
+            return false;
+        }
+
+        $return = array();
         foreach ($fields as $field) {
             if (isset($data[$field])) {
-                $sql.=", " . $field . "=?";
-                $params[] = $data[$field];
+                $return[$field] = $data[$field];
             }
         }
         foreach ($arrays as $field) {
             if (isset($data[$field])) {
-                $sql.=", " . $field . "=?";
-                $params[] = json_encode($data[$field]);
+                $return[$field] = json_decode($data[$field], true);
             }
         }
-        if (isset($data["id"])) {
-            $sql = "INSERT INTO " . $this->prefix . $table . " SET created=UNIX_TIMESTAMP(NOW()), modified=UNIX_TIMESTAMP(NOW()) " . $sql;
-        } else {
-            $sql = "UPDATE " . $this->prefix . $table . " SET modified=UNIX_TIMESTAMP(NOW()) " . $sql . " WHERE id=?";
-            $params[] = $data["id"];
-        }
-        $stmt = $this->prepare($sql);
-        return $stmt->execute($params);
+        return $return;
     }
 
 }
