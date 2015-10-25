@@ -124,7 +124,11 @@ class Client {
         $this->ssl = $ssl;
     }
 
-    function setPlugin(Octopuce\Acme\ValidationPluginInterface $plugin) {
+    /**
+     * 
+     * @param Octopuce\Acme\ValidationPluginInterface $plugin
+     */
+    function setPlugin($plugin) {
         $this->plugins[$plugin->getType()] = $plugin;
     }
 
@@ -174,7 +178,7 @@ class Client {
         $contactApi = array();
         foreach ($contact as $key => $val) {
             if (!in_array($key, $this->contactFields, true)) {
-                throw new AcmeException();
+                throw new AcmeException("Forbidden fields found in the contact hash", 15);
             }
             $contactApi[] = $key . ":" . $val;
         }
@@ -191,11 +195,11 @@ class Client {
         list($headers, ) = $this->stdCall("new-reg", array("contact" => $contactApi));
         if (isset($headers["HTTP"])) {
             if ($headers["HTTP"][1] != "201") {
-                throw new AcmeException(2, "Error " . $headers["HTTP"][0] . " when calling the API");
+                throw new AcmeException("Error " . $headers["HTTP"][0] . " when calling the API", 2);
             }
         }
         if (!isset($headers["Location"])) {
-            throw new AcmeException(3, "Can't call newReg, unexpected result");
+            throw new AcmeException("Can't call newReg, unexpected result", 3);
         }
         $registered = array("id" => $id,
             "status" => self::CONTACT_STATUS_REGISTERED,
@@ -264,13 +268,13 @@ class Client {
      */
     function newAuthz(array $resource) {
         if (!isset($resource["type"]) || !isset($resource["value"])) {
-            throw new AcmeException(4, "Error, missing type or value when calling newAuthz");
+            throw new AcmeException("Error, missing type or value when calling newAuthz", 4);
         }
         if (count($resource) > 2) {
-            throw new AcmeException(5, "Error, Unknown key when calling newAuthz");
+            throw new AcmeException("Error, Unknown key when calling newAuthz", 5);
         }
         if ($resource["type"] != "dns") {
-            throw new AcmeException(6, "Error, unsupported type when calling newAuthz");
+            throw new AcmeException("Error, unsupported type when calling newAuthz", 6);
         }
         $this->checkFqdn($resource["value"]); // may throw Exception
         // now call the API to prepare the AUTHZ
@@ -287,7 +291,7 @@ class Client {
     public function getAuthz($id, $update = false) {
         $me = $this->db->getAuthz($id);
         if (!$me) {
-            throw new AcmeException(13, "Error Authz not found");
+            throw new AcmeException("Error Authz not found", 13);
         }
         if ($update) {
             $httpcall = $this->http->get($me["url"]);
@@ -309,14 +313,14 @@ class Client {
         list($headers, $content) = $httpcall;
         if (isset($headers["HTTP"])) {
             if ($headers["HTTP"][1] != "200") {
-                throw new AcmeException(2, "Error " . $headers["HTTP"][0] . " when calling the API");
+                throw new AcmeException("Error " . $headers["HTTP"][0] . " when calling the API", 2);
             }
         }
         if (!isset($headers["Location"])) {
-            throw new AcmeException(3, "Can't get Authz, unexpected result (missing location header)");
+            throw new AcmeException("Can't get Authz, unexpected result (missing location header)", 3);
         }
         if (!isset($content["challenges"])) {
-            throw new AcmeException(3, "Can't get Authz, unexpected result (missing challenges)");
+            throw new AcmeException("Can't get Authz, unexpected result (missing challenges)", 3);
         }
         $authz = array("type" => $content["type"],
             "value" => $content["value"],
@@ -340,10 +344,10 @@ class Client {
      * Note: a plugin for this challenge type must be loaded before that call
      * @return array an updated authz object, telling which challenge is fine (or not)
      */
-    public function solveChallenge(integer $authzId, string $type) {
+    public function solveChallenge($authzId, $type) {
         $authz = $this->db->getAuthz($authzId);
         if (!$authz) {
-            throw new AcmeException(8, "Error, Authz not found");
+            throw new AcmeException("Error, Authz not found", 8);
         }
         $found = false;
         foreach ($authz["challenges"] as $challenge) {
@@ -353,13 +357,13 @@ class Client {
             }
         }
         if (!$found) {
-            throw new AcmeException(9, "Error, Challenge type not allowed for this Authz");
+            throw new AcmeException("Error, Challenge type not allowed for this Authz", 9);
         }
         if ($challenge["status"] != "pending") {
-            throw new AcmeException(10, "Error, Challenge not in pending status");
+            throw new AcmeException("Error, Challenge not in pending status", 10);
         }
         if (!isset($this->plugins[$type])) {
-            throw new AcmeException(11, "Error, No plugin loaded for this challenge type");
+            throw new AcmeException("Error, No plugin loaded for this challenge type", 11);
         }
         // installValidator returns a 2 element array: result (constant) and answer (may be used later here)
         list($result, $answer) = $this->plugins[$challenge]->installValidator($authz["value"], $challenge);
@@ -396,7 +400,7 @@ class Client {
      * @return array an hash containing all cert informations, including an ID from the Storage, key,csr,crt,chain as PEM strings
      * @throws AcmeException
      */
-    function newCert(string $fqdn, array $altNames = array()) {
+    function newCert($fqdn, $altNames = array()) {
         $this->checkFqdn($fqdn); // may throw Exception
         // Generate a proper CSR / KEY 
         $key = $this->ssl->genRsa();
@@ -406,7 +410,7 @@ class Client {
         list($headers, $content) = $this->stdCall("new-cert", $resource);
         if (isset($headers["HTTP"])) {
             if ($headers["HTTP"][1] != "200") {
-                throw new AcmeException(2, "Error " . $headers["HTTP"][1] . " when calling the API");
+                throw new AcmeException("Error " . $headers["HTTP"][1] . " when calling the API", 2);
             }
         }
         // FIXME WHAT DO I GET BACK ??
@@ -426,10 +430,10 @@ class Client {
      * @param integer $id the cert number in the storage
      * @return array the values of the cert
      */
-    public function getCert(integer $id) {
+    public function getCert($id) {
         $me = $this->db->getCert($id);
         if (!$me) {
-            throw new AcmeException(12, "Error Certificate not found");
+            throw new AcmeException("Error Certificate not found", 12);
         }
         return $me;
     }
@@ -443,14 +447,14 @@ class Client {
      * @return array an hash containing all cert informations, including an ID from the Storage, key,csr,crt,chain as PEM strings
      * @throws AcmeException
      */
-    function revokeCert(integer $id) {
+    function revokeCert($id) {
         $cert = $this->getCert($id);
         // TODO : CODE THIS, NOT CODED YET
         $resource = array("fqdn" => $cert("fqdn"));
         list($headers, $content) = $this->stdCall("revoke-cert", $resource);
         if (isset($headers["HTTP"])) {
             if ($headers["HTTP"][1] != "200") {
-                throw new AcmeException(2, "Error " . $headers["HTTP"][1] . " when calling the API");
+                throw new AcmeException("Error " . $headers["HTTP"][1] . " when calling the API", 2);
             }
         }
         // FIXME WHAT DO I GET BACK ??
@@ -490,7 +494,7 @@ class Client {
         if (substr($api, 0, 4) == "http") {
             $url = $api;
             if (is_null($resource)) {
-                throw new AcmeException(14, "stdCall with URL api MUST include resource name");
+                throw new AcmeException("stdCall with URL api MUST include resource name", 14);
             }
         } else {
             $url = $this->apiUrl[$api];
@@ -531,7 +535,7 @@ class Client {
             return;
         }
         if (is_null($this->userKey)) {
-            throw new AcmeException(1, "You must call newReg or getReg before any API call!");
+            throw new AcmeException("You must call newReg or getReg before any API call!", 1);
         }
         $this->db->lock();
         $status = $this->db->getStatus();
@@ -571,22 +575,22 @@ class Client {
      * @param string $fqdn a FQDN name to check
      * TODO: Is there an official PHP std call for that? maybe from i18n/l10n/punnycode pecl?
      */
-    private function checkFqdn(string $fqdn) {
+    private function checkFqdn($fqdn) {
         if (strlen($fqdn) > 255) {
-            throw new AcmeException(7, "FQDN name is incorrect (name too long)");
+            throw new AcmeException("FQDN name is incorrect (name too long)", 7);
         }
         $members = explode(".", $fqdn);
         if (count($members) <= 1) {
-            throw new AcmeException(7, "FQDN name is incorrect (no dot)");
+            throw new AcmeException("FQDN name is incorrect (no dot)", 7);
         }
         while (list ($key, $val) = each($members)) {
             if (strlen($val) > 63) {
-                throw new AcmeException(7, "FQDN name is incorrect (one member is too long)");
+                throw new AcmeException("FQDN name is incorrect (one member is too long)", 7);
             }
             // Note: RFC1035 tells us that a domain should not start by a digit, but every registrar allows such a domain to be created... too bad.                                             
             // added - at the beginning (for punnycode-encoded strings)
             if (!preg_match("#^[a-z0-9-_]([a-z0-9-_]*[a-z0-9_])?$#i", $val)) {
-                throw new AcmeException(7, "FQDN name is incorrect (unauthorized characters)");
+                throw new AcmeException("FQDN name is incorrect (unauthorized characters)", 7);
             }
         }
     }
