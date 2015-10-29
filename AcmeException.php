@@ -13,15 +13,7 @@ namespace Octopuce\Acme;
  * they contain a code (unique number) and a message (english string)
  * @author benjamin
  */
-class AcmeException extends Exception {
-
-    public $code = 0;
-    public $messsage = "";
-
-    function __construct($code, $message) {
-        $this->code = $code;
-        $this->message = $message;
-    }
+class AcmeException extends \Exception {
 
 }
 

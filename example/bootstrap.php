@@ -16,7 +16,6 @@ require_once("../vendor/autoload.php");
 
 // in normal mode, the classes below would be loaded by using use Octopuce\Acme thanks to autoloader
 // no require_once should be necessary.
-
 // main Acme Library
 require_once("../Client.php");
 
@@ -33,11 +32,11 @@ require_once("../StoragePdo.php");
 require_once("../ValidationPluginInterface.php");
 require_once("../ValidationApache.php");
 
+require_once("../AcmeException.php");
+
 use \Octopuce\Acme;
 
-
 // Create an instance of the Client Library, including its dependent classes: 
-
 // SimpleHTTP validation plugin 
 $validator = new Acme\ValidationApache();
 // HTTP Client (here using php5-curl module)

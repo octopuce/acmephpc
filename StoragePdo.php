@@ -191,8 +191,8 @@ class StoragePdo extends \PDO implements StorageInterface {
      * @return array containing the found data (or false)
      */
     private function autoGet($table, $id, $fields, $arrays) {
-        $sql = "SELECT * FROM " . $this->prefix . $table . " WHERE id=?";
-        $res = $this->query($sql, array($id));
+        $sql = "SELECT * FROM " . $this->prefix . $table . " WHERE id=".intval($id);
+        $res = $this->query($sql);
         $data = $res->fetch(\PDO::FETCH_ASSOC);
 
         if (!$data) {
