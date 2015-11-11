@@ -66,4 +66,3 @@ $client = new Acme\Client($apiroot, $storage, $httpclient, null, $ssl);
 
 // add simpleHTTP validation plugin
 $client->setPlugin($validator);
-

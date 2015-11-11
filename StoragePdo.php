@@ -15,14 +15,29 @@ namespace Octopuce\Acme;
 class StoragePdo extends \PDO implements StorageInterface {
 
     private $prefix = "acme_";
+    private $now = "", $nowts = "", $begin = "", $commit = "";
 
-    /* We don't need our own constructor here, we can call PDO's one anyway
-     * this allows us to open sqlite or pgsql which doesn't need username / password
-      public function __construct($dsn, $username = null, $password = null, $options = array()) {
-      // TODO: ensure we trigger *exceptions* when something goes wrong
-      parent::__construct($dsn, $username, $password, $options);
-      }
-     */
+    public function __construct($dsn, $username = null, $password = null, $options = array()) {
+        parent::__construct($dsn, $username, $password, $options);
+        $this->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        list($driver, ) = explode(":", $dsn, 2);
+        switch ($driver) {
+            case "mysql":
+                $this->now = "NOW()";
+                $this->nowts = "UNIX_TIMESTAMP(NOW())";
+                $this->begin = "LOCK TABLE " . $this->prefix . "status;";
+                $this->commit = "UNLOCK TABLES";
+                break;
+            case "sqlite":
+                $this->now = "date('now')";
+                $this->nowts = "strftime('%s','now')";
+                $this->begin = "BEGIN IMMEDIATE TRANSACTION";
+                $this->commit = "COMMIT";
+                break;
+            default:
+                throw new AcmeException("Unknown or unsupported database driver", 17);
+        }
+    }
 
     /**
      * save the status of the API, this includes
@@ -46,7 +61,8 @@ class StoragePdo extends \PDO implements StorageInterface {
             $sql.=", apiurls=?";
             $params[] = json_encode($data["apiurl"]);
         }
-        $stmt = $this->prepare("UPDATE " . $this->prefix . "status SET modified=NOW() " . $sql);
+        $stmt = $this->prepare("UPDATE " . $this->prefix . "status SET modified=" . $this->now . " " . $sql);
+
         return $stmt->execute($params);
     }
 
@@ -131,16 +147,16 @@ class StoragePdo extends \PDO implements StorageInterface {
      * lock the tables to prevent parallel launches
      */
     public function lock() {
-        // @TODO is it working with PGSQL ? SQLITE ?
-        $this->query("LOCK TABLE " . $this->prefix . "status;");
+        // NOTE: this is more than begin transaction: it requires to LOCK status table
+        // against other READING it, since we use NONCE field before updating it
+        $this->query($this->begin);
     }
 
     /**
      * unlock the tables to prevent parallel launches
      */
     public function unlock() {
-        // @TODO is it working with PGSQL ? SQLITE ?
-        $this->query("UNLOCK TABLES;");
+        $this->query($this->commit);
     }
 
     /**
@@ -169,10 +185,10 @@ class StoragePdo extends \PDO implements StorageInterface {
             }
         }
         if (isset($data["id"])) {
-            $sql = "UPDATE " . $this->prefix . $table . " SET modified=UNIX_TIMESTAMP(NOW()) " . $sql . " WHERE id=?";
+            $sql = "UPDATE " . $this->prefix . $table . " SET modified=" . $this->nowts . " " . $sql . " WHERE id=?";
             $params[] = $data["id"];
         } else {
-            $sql = "INSERT INTO " . $this->prefix . $table . " SET created=UNIX_TIMESTAMP(NOW()), modified=UNIX_TIMESTAMP(NOW()) " . $sql;
+            $sql = "INSERT INTO " . $this->prefix . $table . " SET created=" . $this->nowts . ", modified=" . $this->nowts . " " . $sql;
         }
         $stmt = $this->prepare($sql);
         if ($stmt->execute($params)) {

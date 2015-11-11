@@ -140,11 +140,18 @@ class Client {
      */
     function enumApi($nosave = false) {
         $endpoints = array("new-authz", "new-cert", "new-reg", "revoke-cert");
+        $found=count($endpoints);
         list($h, $c) = $this->http->get($this->api . "/directory");
         $status = array();
-        if (isset($h["Replay-Nonce"])) {
-            $this->nonce = $status["nonce"] = $h["Replay-Nonce"][0];
+        if (!isset($h["Replay-Nonce"])) {
+            throw new AcmeException("Bad response from Acme Server", 16);
         }
+        $this->nonce = $status["nonce"] = $h["Replay-Nonce"][0];
+        $status["noncets"] = time();
+        if (!$nosave) {
+            $this->db->setStatus($status);
+        }
+
         /* [new-authz] => https://acme-staging.api.letsencrypt.org/acme/new-authz
          * [new-cert] => https://acme-staging.api.letsencrypt.org/acme/new-cert
          * [new-reg] => https://acme-staging.api.letsencrypt.org/acme/new-reg
@@ -154,11 +161,11 @@ class Client {
         foreach ($endpoints as $e) {
             if (isset($res[$e])) {
                 $status["apiurl"][$e] = $res[$e];
+                $found--; // we expect as many endpoints as we know.
             }
         }
-        $status["noncets"] = time();
-        if (!$nosave) {
-            $this->db->setStatus($status);
+        if ($found) {
+            throw new AcmeException("Bad response from Acme Server", 16);
         }
         return $status["apiurl"];
     }

@@ -22,8 +22,22 @@ class HttpClientTest implements \Octopuce\Acme\HttpClientInterface {
      * @return array a 2 elements array with headers as an array of key=>value and content as a string
      */
     function get($url) {
+
+        if (preg_match('#^/directory$#', $url)) {
+            $headers = array(
+                "HTTP" => array("200", "OK"),
+                "Replay-Nonce" => $this->newNonce()
+            );
+            $content = json_encode(array(
+                "new-authz" => "/new-authz",
+                "new-cert" => "/new-cert",
+                "new-reg" => "/new-reg",
+                "revoke-cert" => "/revoke-cert"
+            ));
+            return array($headers, $content);
+        }
         $headers = array();
-        $content = array();
+        $content = "";
         return array($headers, $content);
     }
 
@@ -37,8 +51,17 @@ class HttpClientTest implements \Octopuce\Acme\HttpClientInterface {
      */
     function post($url, $post) {
         $headers = array();
-        $content = array();
+        $content = "";
         return array($headers, $content);
+    }
+
+    function newNonce() {
+        $rand = "0123456789abcdef";
+        $random = "";
+        for ($i = 0; $i < 12; $i++) {
+            $random.=substr($rand, rand(0, 15), 1);
+        }
+        return "fef5e3da-0898-4493-b7b4-" . $random;
     }
 
 }
