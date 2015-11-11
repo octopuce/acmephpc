@@ -16,10 +16,13 @@ class StoragePdo extends \PDO implements StorageInterface {
 
     private $prefix = "acme_";
 
-    public function __construct($dsn, $username = null, $password = null, $options = array()) {
-        // TODO: ensure we trigger *exceptions* when something goes wrong
-        parent::__construct($dsn, $username, $password, $options);
-    }
+    /* We don't need our own constructor here, we can call PDO's one anyway
+     * this allows us to open sqlite or pgsql which doesn't need username / password
+      public function __construct($dsn, $username = null, $password = null, $options = array()) {
+      // TODO: ensure we trigger *exceptions* when something goes wrong
+      parent::__construct($dsn, $username, $password, $options);
+      }
+     */
 
     /**
      * save the status of the API, this includes
@@ -128,6 +131,7 @@ class StoragePdo extends \PDO implements StorageInterface {
      * lock the tables to prevent parallel launches
      */
     public function lock() {
+        // @TODO is it working with PGSQL ? SQLITE ?
         $this->query("LOCK TABLE " . $this->prefix . "status;");
     }
 
@@ -135,6 +139,7 @@ class StoragePdo extends \PDO implements StorageInterface {
      * unlock the tables to prevent parallel launches
      */
     public function unlock() {
+        // @TODO is it working with PGSQL ? SQLITE ?
         $this->query("UNLOCK TABLES;");
     }
 
@@ -191,7 +196,7 @@ class StoragePdo extends \PDO implements StorageInterface {
      * @return array containing the found data (or false)
      */
     private function autoGet($table, $id, $fields, $arrays) {
-        $sql = "SELECT * FROM " . $this->prefix . $table . " WHERE id=".intval($id);
+        $sql = "SELECT * FROM " . $this->prefix . $table . " WHERE id=" . intval($id);
         $res = $this->query($sql);
         $data = $res->fetch(\PDO::FETCH_ASSOC);
 
