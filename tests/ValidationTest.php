@@ -6,14 +6,14 @@
  * distributed under LPGL 2.1+ see LICENSE file
  */
 
-namespace Octopuce\Acme;
+namespace Octopuce\Acme\Test;
 
 /**
  * Acme Challenge installer/removal scripts, 
  * that should usually be adapted to your bind/apache/nginx ... configuration
  * @author benjamin
  */
-class ValidationTest implements ValidationPluginInterface {
+class ValidationTest implements \Octopuce\Acme\ValidationPluginInterface {
 
     /**
      * Install a validator by giving it the necessary data 

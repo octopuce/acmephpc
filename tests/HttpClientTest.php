@@ -12,7 +12,7 @@ namespace Octopuce\Acme\Test;
  * Acme HTTP GET/POST calls class using dummy code to test the library
  * @author benjamin
  */
-class HttpClientTest implements Octopuce\Acme\HttpClientInterface {
+class HttpClientTest implements \Octopuce\Acme\HttpClientInterface {
 
     /**
      * Call a HTTP or HTTPS url using a GET method

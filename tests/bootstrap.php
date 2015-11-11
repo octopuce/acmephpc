@@ -21,7 +21,7 @@ require_once("../SslInterface.php");
 require_once("../SslPhpseclib.php");
 
 require_once("../StorageInterface.php");
-require_once("StorageTest.php");
+require_once("../StoragePdo.php");
 
 require_once("../ValidationPluginInterface.php");
 require_once("ValidationTest.php");
@@ -34,26 +34,36 @@ use \Octopuce\Acme;
 // Create an instance of the Client Library, including the TestPlugins and TestInterfaces
 
 $validator=new ValidationTest();
-$storage = new StorageTest();
 $httpclient=new HttpClientTest();
 
 // SSL Security library (here using phpseclib, since we need it anyway...)
 $ssl = new Acme\SslPhpseclib();
 
-/*
-  // Connect to the MySQL DB
-try {
-    $storage = new Acme\StoragePdo($db_dsn, $db_user, $db_pass);
-} catch (PDOException $e) {
-    echo "Fatal error connecting to the database : " . $e->getMessage() . "\n";
+// We create a dummy sqlite database in memory and fill it with our schema :
+$storage = new Acme\StoragePdo("sqlite::memory:");
+
+// Inject the base schema : 
+$f=fopen("../acmephp.sqlite.sql","rb");
+$query="";
+while ($s=fgets($f,1024)) {
+    $s=trim($s);
+    if (substr($s,0,2)=="--") {
+        continue;
+    }
+    $query.=$s."\n";
+    if (substr($s,-1)==";") {
+        $storage->query($query);
+        $query="";
+    }
 }
-*/
+fclose($f);
 
-$storage = new Acme\StoragePdo("sqlite:/tmp/acmephp-tests.".getmypid().".sqlite");
-   
-// And Instance the ACME PHP Client:
+// our http client is dummy anyway ;) 
+$apiroot="/";
+
+// Instance the ACME PHP Client:
 $client = new Acme\Client($apiroot, $storage, $httpclient, null, $ssl);
-// and add simpleHTTP validation plugin
-$client->setPlugin($validator);
 
+// add simpleHTTP validation plugin
+$client->setPlugin($validator);
 
