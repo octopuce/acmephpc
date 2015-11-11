@@ -26,7 +26,7 @@ class HttpClientTest implements \Octopuce\Acme\HttpClientInterface {
         if (preg_match('#^/directory$#', $url)) {
             $headers = array(
                 "HTTP" => array("200", "OK"),
-                "Replay-Nonce" => $this->newNonce()
+                "Replay-Nonce" => array($this->newNonce())
             );
             $content = json_encode(array(
                 "new-authz" => "/new-authz",
