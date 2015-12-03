@@ -2,7 +2,7 @@
 -- Server version	5.5.46-0+deb7u1-log
 
 SET NAMES utf8;
-SET TIME_ZONE='+00:00'
+SET TIME_ZONE='+00:00';
 SET character_set_client = utf8;
 
 -- ------------------------------------------------------
