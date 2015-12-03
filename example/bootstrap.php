@@ -51,6 +51,11 @@ try {
     echo "Fatal error connecting to the database : " . $e->getMessage() . "\n";
 }
 
+try { // if we use the stock curl class, verbose allow for some debugging ;) while waiting for PSR-3 logging...
+    $httpclient->verbose = true;
+} catch (Exception $ex) {
+    
+}
 // And Instance the ACME PHP Client:
 $client = new Acme\Client($apiroot, $storage, $httpclient, null, $ssl);
 // and add simpleHTTP validation plugin
