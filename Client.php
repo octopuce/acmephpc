@@ -121,7 +121,11 @@ class Client {
         $this->db = $db;
         $this->http = $http;
         $this->log = $log;
-        $this->ssl = $ssl;
+        if (is_null($ssl)) {
+            $this->ssl = new SslPhpseclib();
+        } else {
+            $this->ssl = $ssl;
+        }
     }
 
     /**
@@ -140,7 +144,7 @@ class Client {
      */
     function enumApi($nosave = false) {
         $endpoints = array("new-authz", "new-cert", "new-reg", "revoke-cert");
-        $found=count($endpoints);
+        $found = count($endpoints);
         list($h, $c) = $this->http->get($this->api . "/directory");
         $status = array();
         if (!isset($h["Replay-Nonce"])) {

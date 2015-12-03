@@ -42,8 +42,8 @@ CREATE TABLE `acme_contact` (
   `contact` text NOT NULL,
   `privatekey` text NOT NULL,
   `publickey` text NOT NULL,
-  `contract` text NOT NULL,
-  `url` text NOT NULL,
+  `contract` text NOT NULL DEFAULT '',
+  `url` text NOT NULL DEFAULT '',
   `status` int(10) NOT NULL
 );
 

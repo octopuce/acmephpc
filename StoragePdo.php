@@ -170,25 +170,42 @@ class StoragePdo extends \PDO implements StorageInterface {
      * @return boolean true if the request executed successfully
      */
     private function autoSet($table, $data, $fields, $arrays) {
-        $sql = "";
-        $params = array();
-        foreach ($fields as $field) {
-            if (isset($data[$field])) {
-                $sql.=", " . $field . "=?";
-                $params[] = $data[$field];
-            }
-        }
-        foreach ($arrays as $field) {
-            if (isset($data[$field])) {
-                $sql.=", " . $field . "=?";
-                $params[] = json_encode($data[$field]);
-            }
-        }
         if (isset($data["id"])) {
+            $sql = "";
+            $params = array();
+            foreach ($fields as $field) {
+                if (isset($data[$field])) {
+                    $sql.=", " . $field."=?";
+                    $params[] = $data[$field];
+                }
+            }
+            foreach ($arrays as $field) {
+                if (isset($data[$field])) {
+                    $sql.=", " . $field."=?";;
+                    $params[] = json_encode($data[$field]);
+                }
+            }
             $sql = "UPDATE " . $this->prefix . $table . " SET modified=" . $this->nowts . " " . $sql . " WHERE id=?";
             $params[] = $data["id"];
         } else {
-            $sql = "INSERT INTO " . $this->prefix . $table . " SET created=" . $this->nowts . ", modified=" . $this->nowts . " " . $sql;
+            $sql1 = "";
+            $sql2 = "";
+            $params = array();
+            foreach ($fields as $field) {
+                if (isset($data[$field])) {
+                    $sql1.=", " . $field;
+                    $sql2.=", ?";
+                    $params[] = $data[$field];
+                }
+            }
+            foreach ($arrays as $field) {
+                if (isset($data[$field])) {
+                    $sql1.=", " . $field;
+                    $sql2.=", ?";
+                    $params[] = json_encode($data[$field]);
+                }
+            }
+            $sql = "INSERT INTO " . $this->prefix . $table . " ( created, modified".$sql1." ) VALUES (" . $this->nowts . ", ". $this->nowts . " " . $sql2." )";
         }
         $stmt = $this->prepare($sql);
         if ($stmt->execute($params)) {

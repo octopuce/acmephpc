@@ -48,8 +48,8 @@ CREATE TABLE `acme_contact` (
   `contact` text NOT NULL,
   `privatekey` text NOT NULL,
   `publickey` text NOT NULL,
-  `contract` text NOT NULL,
-  `url` text NOT NULL,
+  `contract` text NOT NULL DEFAULT '',
+  `url` text NOT NULL DEFAULT '',
   `status` int(10) unsigned NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Registered accounts on ACME server';
