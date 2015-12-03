@@ -152,9 +152,6 @@ class Client {
         }
         $this->nonce = $status["nonce"] = $h["Replay-Nonce"][0];
         $status["noncets"] = time();
-        if (!$nosave) {
-            $this->db->setStatus($status);
-        }
 
         /* [new-authz] => https://acme-staging.api.letsencrypt.org/acme/new-authz
          * [new-cert] => https://acme-staging.api.letsencrypt.org/acme/new-cert
@@ -170,6 +167,9 @@ class Client {
         }
         if ($found) {
             throw new AcmeException("Bad response from Acme Server", 16);
+        }
+        if (!$nosave) {
+            $this->db->setStatus($status);
         }
         return $status["apiurl"];
     }
@@ -520,14 +520,17 @@ class Client {
         $jwt->header['jwk'] = $jwk->components;
         $jwt->header['nonce'] = $this->nonce;
 
-        $jws = $jwt->sign($this->userKey["privatekey"], 'RS512');
+        // as of 20151203, boulder doesn't support SHA512
+        $jws = $jwt->sign($this->userKey["privatekey"], 'RS256'); 
 
 
         // call the API
         $httpResult = $this->http->post($url, $jws->toJson());
         // save the new Nonce
-        if (isset($httpResult[0]["Replay-Nonce"])) {
+        if (isset($httpResult[0]["Replay-Nonce"]) && $httpResult[0]["Replay-Nonce"]) {
             $this->nonce = $httpResult[0]["Replay-Nonce"][0];
+            // we save this nonce, so that next call will have it ready to use:
+            $this->db->setStatus(array("nonce"=>$this->nonce));
         } else {
             $this->nonce = null;
         }
