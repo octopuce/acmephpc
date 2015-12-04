@@ -59,6 +59,12 @@ We still need help
  * implementing automatic renewal through a proposed crontab 
  * writing plugins for DNS and SNI validations for bind9, apache2, nginx etc. 
  * maybe adds new API calls to say which FQDN shall be automatically renewed (since certificates are only valid for 90 days, automatic renewal is a must having ofc)
+ * doing the Logging using PSR-3-style logging
+
+# IDEAS
+
+ * maybe use [Guzzle](http://guzzlephp.org/) instead of having our own HTTPClient lib ? (although we need support for multiple HTTP answer headers having the same name, like "Link")
+ * <insert yours here ;) >
 
 # License 
 
