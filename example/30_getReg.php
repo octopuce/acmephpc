@@ -2,11 +2,11 @@
 
 require_once("bootstrap.php");
 
-$id = 24;
+$id = 12;
 
 echo "We get account information:\n";
 
 print_r(
-        $client->getReg($id)
+        $client->getReg($id,true)
 );
 
