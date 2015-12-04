@@ -25,7 +25,7 @@ class StoragePdo extends \PDO implements StorageInterface {
             case "mysql":
                 $this->now = "NOW()";
                 $this->nowts = "UNIX_TIMESTAMP(NOW())";
-                $this->begin = "LOCK TABLE " . $this->prefix . "status;";
+                $this->begin = "LOCK TABLE " . $this->prefix . "status WRITE," . $this->prefix . "authz WRITE," . $this->prefix . "cert WRITE," . $this->prefix . "contact WRITE;";
                 $this->commit = "UNLOCK TABLES";
                 break;
             case "sqlite":

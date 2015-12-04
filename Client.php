@@ -40,6 +40,13 @@ class Client {
     const CONTACT_STATUS_ERROR = 99;
 
     /**
+     * Values that validators can return
+     */
+    const VALIDATOR_OK = 1;
+    const VALIDATOR_PENDING = 2;
+    const VALIDATOR_ERRROR = 99;
+
+    /**
      * current Nonce (available)
      */
     protected $nonce;
@@ -51,9 +58,16 @@ class Client {
 
     /**
      * @var array public and private part of the current user.
+     * along with other DB informations
      * use newReg or getReg to fill this one BEFORE any other API call
      */
-    protected $userKey = null;
+    public $userKey = null;
+
+    /**
+     *
+     * @var string the thumbprint of the publickey as stated in RFC7638
+     */
+    public $keyid = "";
 
     /**
      * ROOT URL of the API (default to LetsEncrypt one)
@@ -134,6 +148,7 @@ class Client {
      */
     function setPlugin($plugin) {
         $this->plugins[$plugin->getType()] = $plugin;
+        $plugin->setClient($this);
     }
 
     /** Enumerate the API functions from a starting point
@@ -240,6 +255,7 @@ class Client {
                 // TODO: what if there is NOT TOS to sign??
             }
         }
+        $this->keyid = "";
         return $id;
     }
 
@@ -260,10 +276,11 @@ class Client {
         if (!$me) {
             return false;
         }
-        $this->userKey = $me["privatekey"];
+        $this->userKey = $me;
         if (!$privatekeytoo) {
             unset($me["privatekey"]);
         }
+        $this->keyid = "";
         return $me;
     }
 
@@ -289,7 +306,7 @@ class Client {
         }
         $this->checkFqdn($resource["value"]); // may throw Exception
         // now call the API to prepare the AUTHZ
-        $httpcall = $this->stdCall("new-authz", $resource);
+        $httpcall = $this->stdCall("new-authz", array("identifier" => $resource));
         return $this->saveAuthz($httpcall);
     }
 
@@ -306,7 +323,8 @@ class Client {
         }
         if ($update) {
             $httpcall = $this->http->get($me["url"]);
-            return $this->saveAuthz($httpcall, $id);
+            return $this->saveAuthz(
+                            array($httpcall[0], json_decode($httpcall[1])), $id);
         }
         return $me;
     }
@@ -320,25 +338,24 @@ class Client {
      * @return array the entire authz information including challenges and id
      * @throws AcmeException
      */
-    private function saveAuthz(array $httpcall, integer $id = null) {
+    private function saveAuthz($httpcall, $id = null) {
         list($headers, $content) = $httpcall;
         if (isset($headers["HTTP"])) {
             if ($headers["HTTP"][1] != "200") {
                 throw new AcmeException("Error " . $headers["HTTP"][0] . " when calling the API", 2);
             }
         }
-        if (!isset($headers["Location"])) {
-            throw new AcmeException("Can't get Authz, unexpected result (missing location header)", 3);
-        }
-        if (!isset($content["challenges"])) {
+        if (!isset($content->challenges)) {
             throw new AcmeException("Can't get Authz, unexpected result (missing challenges)", 3);
         }
-        $authz = array("type" => $content["type"],
-            "value" => $content["value"],
-            "url" => $headers["Location"][0],
-            "challenges" => $content["challenges"]
+        $authz = array("type" => $content->identifier->type,
+            "value" => $content->identifier->value,
+            "challenges" => $content->challenges
         );
-        if (!isnull($id)) {
+        if (isset($headers["Location"])) {
+            $authz["url"] = $headers["Location"][0];
+        }
+        if (!is_null($id)) {
             $authz["id"] = $id;
         }
         // store it along with contact information
@@ -377,26 +394,34 @@ class Client {
             throw new AcmeException("Error, No plugin loaded for this challenge type", 11);
         }
         // installValidator returns a 2 element array: result (constant) and answer (may be used later here)
-        list($result, $answer) = $this->plugins[$challenge]->installValidator($authz["value"], $challenge);
-        if ($result == ACME_CHALLENGE_OK) {
+        list($result, $answer) = $this->plugins[$type]->installValidator($authz["value"], $challenge);
+        if ($result == Client::VALIDATOR_OK) {
             $resource = array(
                 "resource" => "challenge",
-                "type" => "simpleHttp"
+                "type" => $type
             );
             switch ($type) {
-                case "simpleHttp":
-                    $resource["token"] = $challenge["token"];
-                    $resource["tls"] = $answer["tls"];
+                case "http-01":
+                    $resource["keyAuthorization"] = $challenge["token"] . "." . $this->getKeyId();
                     break;
-                case "dns":
+                case "dns-01":
                     $resource = array(); // TODO ! IMPLEMENTS DNS VALIDATION CALL
+                    break;
+                case "dvsni-01":
+                    $resource = array(); // TODO ! IMPLEMENTS DVSNI VALIDATION CALL
                     break;
             }
             // call for this challenge 
-            $this->stdCall($challenge["uri"], $resource, "challenge");
-            // what do I get back ?
+            list($headers, $content) = $this->stdCall($challenge["uri"], $resource, "challenge");
+            if (isset($headers["HTTP"])) {
+                if ($headers["HTTP"][1] != "202") {
+                    throw new AcmeException("Error " . $headers["HTTP"][0] . " when calling the API", 2);
+                }
+            }
+            return true;
         }
-        return $authz;
+
+        return false;
     }
 
     /**
@@ -490,6 +515,22 @@ class Client {
     }
 
     /**
+     * Returns the keyAuthorization as specified in https://tools.ietf.org/html/draft-ietf-acme-acme-01#section-7.1
+     * a newReg or getReg call MUST have been done before to fill $this->userKey
+     * @return string $keyAuthorization
+     */
+    function getKeyId() {
+        if ($this->keyid) {
+            return $this->keyid;
+        }
+        $public_key = new RSA();
+        $public_key->loadKey($this->userKey["publickey"]);
+        $jwk = \JOSE_JWK::encode($public_key); // => JOSE_JWK instance
+
+        return $this->keyid = $jwk->thumbprint();
+    }
+
+    /**
      * Call a ACME standard URL using JWS encoding signing for $this->userKey
      * @param string $api api url to call (short name, like "new-reg" or starting by http)
      * @param array $params list of key=>value to sent as a json object or array.
@@ -521,7 +562,7 @@ class Client {
         $jwt->header['nonce'] = $this->nonce;
 
         // as of 20151203, boulder doesn't support SHA512
-        $jws = $jwt->sign($this->userKey["privatekey"], 'RS256'); 
+        $jws = $jwt->sign($this->userKey["privatekey"], 'RS256');
 
 
         // call the API
@@ -530,7 +571,7 @@ class Client {
         if (isset($httpResult[0]["Replay-Nonce"]) && $httpResult[0]["Replay-Nonce"]) {
             $this->nonce = $httpResult[0]["Replay-Nonce"][0];
             // we save this nonce, so that next call will have it ready to use:
-            $this->db->setStatus(array("nonce"=>$this->nonce));
+            $this->db->setStatus(array("nonce" => $this->nonce));
         } else {
             $this->nonce = null;
         }

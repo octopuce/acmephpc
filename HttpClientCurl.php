@@ -5,6 +5,7 @@
  * (C) 2015 Benjamin Sonntag <benjamin@octopuce.fr>
  * distributed under LPGL 2.1+ see LICENSE file
  */
+
 namespace Octopuce\Acme;
 
 /**
@@ -17,6 +18,7 @@ class HttpClientCurl implements HttpClientInterface {
 
     protected $curlopts = array();
     protected $curlHandle = null;
+    public $verbose = false;
 
     /**
      * Call a HTTP or HTTPS url using a GET method
@@ -44,7 +46,7 @@ class HttpClientCurl implements HttpClientInterface {
         $this->_init();
         curl_setopt($this->curlHandle, CURLOPT_POST, true);
         curl_setopt($this->curlHandle, CURLOPT_POSTFIELDS, $post);
-        echo "POST:".$post."\n";
+        if ($this->verbose) echo "POST:" . $post . "\n";
         return $this->_curlCall($url);
     }
 
@@ -62,7 +64,7 @@ class HttpClientCurl implements HttpClientInterface {
      */
     private function _init() {
         $this->curlHandle = curl_init();
-        curl_setopt($this->curlHandle, CURLOPT_VERBOSE, true);
+        if ($this->verbose) curl_setopt($this->curlHandle, CURLOPT_VERBOSE, true);
 
         //  $header = array();  curl_setopt($this->curlHandle, CURLOPT_HTTPHEADER, $header);                                                                                                                                                                    
         curl_setopt($this->curlHandle, CURLOPT_HTTPHEADER, array('Expect:'));
@@ -76,8 +78,8 @@ class HttpClientCurl implements HttpClientInterface {
         //curl_setopt($this->curlHandle, CURLOPT_VERBOSE, true);
         foreach ($this->curlopts as $key => $value) {
             curl_setopt($this->curlHandle, $key, $value);
-        } 
-   }
+        }
+    }
 
     private function _curlCall($url) {
         curl_setopt($this->curlHandle, CURLOPT_URL, $url);
@@ -93,7 +95,7 @@ class HttpClientCurl implements HttpClientInterface {
             }
             if ($firstline) {
                 $firstline = false;
-                $headers["HTTP"]=explode(" ", $line);
+                $headers["HTTP"] = explode(" ", $line);
             } else {
                 if (!trim($line) && $inheaders) {
                     $inheaders = false;
@@ -104,6 +106,7 @@ class HttpClientCurl implements HttpClientInterface {
                 }
             }
         }
+        if ($this->verbose) echo "Headers:".print_r($headers,true)."\nContent:".print_r($content,true)."\n";
         return array($headers, $content);
     }
 

@@ -16,6 +16,11 @@ namespace Octopuce\Acme;
 interface ValidationPluginInterface {
 
     /**
+     * store the CLIENT object in case it needs it
+     */
+    function setClient(&$client);
+
+    /**
      * Install a validator by giving it the necessary data 
      * (the raw json_decoded structure of the Acme Auth Object)
      * @param string $fqdn
