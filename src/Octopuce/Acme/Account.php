@@ -95,8 +95,8 @@ class Account extends AbstractEntity implements StorableInterface, AccountInterf
     {
         $id = (int) $id;
 
-        if (empty($id)) {
-            throw new \InvalidArgumentException('Id must be set prior to load');
+        if ($id === 0) {
+            throw new \InvalidArgumentException('Empty id provided');
         }
 
         if (!$data = $this->storage->findById($id, 'account')) {
@@ -105,9 +105,9 @@ class Account extends AbstractEntity implements StorableInterface, AccountInterf
 
         $this->id         = $id;
         $this->contact    = $data['contact'];
-        $this->setKeys($data['privatekey'], $data['publickey']);
         $this->url        = $data['url'];
         $this->status     = $data['status'];
+        $this->setKeys($data['privatekey'], $data['publickey']);
 
         return $this;
     }
