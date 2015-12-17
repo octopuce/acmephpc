@@ -22,28 +22,59 @@ class Http implements SolverInterface
     public function __construct(array $config)
     {
         $this->targetPath = $config['target-path'];
+
+        if (!preg_match('#\.well-known.acme-challenge#', $this->targetPath)) {
+
+            $this->targetPath = sprintf(
+                '%s%s.well-known%sacme-challenge%s',
+                rtrim($this->targetPath, DIRECTORY_SEPARATOR),
+                DIRECTORY_SEPARATOR,
+                DIRECTORY_SEPARATOR,
+                DIRECTORY_SEPARATOR
+            );
+
+        }
     }
 
     /**
      * Solve the challenge by placing a file in a web root folder
      *
      * @param string $token
-     * @param string $publicKey
+     * @param string $key
      *
      * @return bool
      *
      * @throws \RuntimeException
      */
-    public function solve($token, $publicKey)
+    public function solve($token, $key)
     {
-        $targetFile = $this->targetPath.$token.'.txt';
+        $this->createTargetDir($this->targetPath);
 
-        if (false === file_put_contents($targetFile, $token.$publicKey)) {
+        $targetFile = $this->targetPath.$token;
+
+        if (false === file_put_contents($targetFile, $token.'.'.$key)) {
             throw new \RuntimeException(sprintf('Unable to write file %s', $targetFile));
         }
 
         return true;
     }
+
+    /**
+     * Create target directory
+     *
+     * @param string $directory
+     *
+     * @return void
+     *
+     * @throws \RuntimeException
+     */
+    private function createTargetDir($directory)
+    {
+        if (!is_dir($directory) && !mkdir($directory, 0755, true)) {
+            throw new \RuntimeException(sprintf('Unable to create target directory %s', $directory));
+        }
+    }
+
 
     /**
      * @inheritDoc

@@ -43,12 +43,6 @@ class Client extends Container implements ClientInterface
     private $initialized = false;
 
     /**
-     * Nonce
-     * @var string
-     */
-    private $nonce;
-
-    /**
      * @inheritDoc
      */
     public function __construct(array $values = array())

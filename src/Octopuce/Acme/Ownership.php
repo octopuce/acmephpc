@@ -73,6 +73,7 @@ class Ownership extends AbstractEntity implements StorableInterface, OwnershipIn
      *
      * @return $this
      *
+     * @throws \UnexpectedValueException
      * @throws ChallengeFailException
      */
     public function challenge(SolverInterface $solver, $fqdn)
@@ -91,12 +92,18 @@ class Ownership extends AbstractEntity implements StorableInterface, OwnershipIn
             $availableChallenges[] = $challenge['type'];
 
             if ($challenge['type'] == $solver->getType()) {
+
+                if ($challenge['status'] != 'pending') {
+                    throw new \UnexpectedValueException('Challenge is not in pending status');
+                }
+
+                $targetUrl = $challenge['uri'];
                 $token = $challenge['token'];
                 break;
             }
         }
 
-        if (null === $token) {
+        if (null === $token || null == $targetUrl) {
             throw new \RuntimeException(sprintf(
                 'Challenge type %s not found for current ownership, available challenges are : %s',
                 $solver->getType(),
@@ -107,6 +114,8 @@ class Ownership extends AbstractEntity implements StorableInterface, OwnershipIn
         if (!$solver->solve($token, $thumbprint)) {
             throw new ChallengeFailException('Unable to solve challenge');
         }
+
+        $this->client->challengeOwnership($targetUrl, $solver->getType(), $token.'.'.$thumbprint, $this->getPrivateKey(), $this->getPublicKey());
 
         return $this;
     }

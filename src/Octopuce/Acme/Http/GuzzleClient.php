@@ -108,6 +108,30 @@ class GuzzleClient implements HttpClientInterface
     }
 
     /**
+     * Challenge Ownership
+     *
+     * @param string $url
+     * @param string $type
+     * @param string $keyAuth
+     * @param string $privateKey
+     * @param string $publicKey
+     *
+     * @return \Guzzle\Http\Message\Response
+     */
+    public function challengeOwnership($url, $type, $keyAuth, $privateKey, $publicKey)
+    {
+        $params = array(
+            'resource'         => 'challenge',
+            'type'             => $type,
+            'keyAuthorization' => $keyAuth,
+        );
+
+        return $this->processResponse(
+            $this->sendPostRequest($url, $params, $privateKey, $publicKey)
+        );
+    }
+
+    /**
      * Register new account
      *
      * @param string $mailto
@@ -252,14 +276,22 @@ class GuzzleClient implements HttpClientInterface
 
         try {
 
-            return $this->guzzle->post(
+            return  $this->guzzle->post(
                 $url,
                 null,
                 $signedParams
             )->send();
 
         } catch (\Exception $e) {
-            throw new ApiCallErrorException($e->getMessage(), 2);
+
+            $error = $e->getMessage();
+
+            if ($e instanceof \Guzzle\Http\Exception) {
+                $errorDetails = json_decode($e->getResponse()->getBody(true), true);
+                $error .= "\n[detail] ".$errorDetails['detail'];
+            }
+
+            throw new ApiCallErrorException($error, 2);
         }
     }
 
@@ -307,7 +339,7 @@ class GuzzleClient implements HttpClientInterface
         return $this->endPoints[$operation];
     }
 
-	/**
+    /**
      * Set endPoints
      *
      * @param array $endPoints
