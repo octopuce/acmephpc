@@ -95,14 +95,6 @@ class Certificate extends AbstractEntity implements CertificateInterface, Storab
     }
 
     /**
-     * Save certificate to storage
-     */
-    public function save()
-    {
-        return $this->storage->save($this);
-    }
-
-    /**
      * Get storable data
      *
      * @return array
