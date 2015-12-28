@@ -2,7 +2,6 @@
 
 namespace Octopuce\Acme;
 
-use Octopuce\Acme\Storage\StorageInterface;
 use Octopuce\Acme\Http\HttpClientInterface;
 use Octopuce\Acme\Exception\InvalidRegisterArgumentException;
 use Octopuce\Acme\Exception\AccountNotFoundException;

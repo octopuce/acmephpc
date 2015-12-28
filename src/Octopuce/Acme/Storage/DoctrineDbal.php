@@ -146,7 +146,7 @@ class DoctrineDbal implements StorageInterface
     }
 
     /**
-     * Find by any object Id
+     * Find any object by Id
      *
      * @param int $id
      *

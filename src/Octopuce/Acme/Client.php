@@ -197,12 +197,13 @@ class Client extends Container implements ClientInterface
      * Challenge an existing ownership
      *
      * @param int    $accountId  Id of account
-     * @param string $type       Challenge type
-     * @param string $value      Value of ownership (usually a fqdn)
+     * @param string $fqdn       FQDN to challenge
+     *
+     * @return $this
      *
      * @throws \InvalidArgumentException
      */
-    public function challengeOwnership($accountId, $value)
+    public function challengeOwnership($accountId, $fqdn)
     {
         try {
             $challengeType = $this['params']['challenge']['type'];
@@ -215,26 +216,37 @@ class Client extends Container implements ClientInterface
 
         $account = $this['account']->load($accountId);
 
-        return $this['ownership']
+        $this['ownership']
             ->setKeys($account->getPrivateKey(), $account->getPublicKey())
             ->challenge(
                 $challengeSolver,
-                $value
+                $fqdn
             );
+
+        return $this;
     }
 
     /**
+     * Sign a certificate for specified fqdn
      *
+     * @param int    $accountId  Id of account
+     * @param string $fqdn       FQDN to challenge
+     * @param array  $altNames   Alternative names
+     *
+     * @return $this
      */
-    public function signCertificate($fqdn)
+    public function signCertificate($accountId, $fqdn, array $altNames = array())
     {
         $this->init();
 
-        return $this['certificate']
-            ->sign(
-                $this['account']->load($accountId),
-                $fqdn
-            );
+        $account = $this['account']->load($accountId);
+
+        $certificate = $this['certificate']
+            ->setKeys($account->getPrivateKey(), $account->getPublicKey())
+            ->sign($fqdn)
+            ->save();
+
+        return $this;
     }
 
     public function revokeCertificate($id)

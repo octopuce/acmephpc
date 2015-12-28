@@ -48,7 +48,7 @@ class GuzzleClientTest extends \PHPUnit_Framework_TestCase
             ->method('post')
             ->will($this->returnValue($this->requestMock));
 
-        $this->storageMock = $this->getMockBuilder('\Octopuce\Acme\Storage\StorageInterface')
+        $this->storageMock = $this->getMockBuilder('\Octopuce\Acme\Storage\DoctrineDbal')
             ->setMethods(array('updateNonce'))
             ->disableOriginalConstructor()
             ->getMock();
@@ -74,7 +74,7 @@ class GuzzleClientTest extends \PHPUnit_Framework_TestCase
         $this->responseMock->expects($this->once())
             ->method('offsetExists')
             ->will($this->returnValue(true));
-        $this->responseMock->expects($this->exactly(2))
+        $this->responseMock->expects($this->once())
             ->method('getHeaders');
 
         $this->client->enumerate('/api');
@@ -108,7 +108,7 @@ class GuzzleClientTest extends \PHPUnit_Framework_TestCase
         $this->responseMock->expects($this->atLeastOnce())
             ->method('offsetExists')
             ->will($this->returnValue(true));
-        $this->responseMock->expects($this->exactly(3))
+        $this->responseMock->expects($this->exactly(2))
             ->method('getHeaders');
         $this->responseMock->expects($this->any())
             ->method('get')
@@ -131,7 +131,7 @@ class GuzzleClientTest extends \PHPUnit_Framework_TestCase
 
         $this->responseMock->expects($this->atLeastOnce())
             ->method('offsetExists')
-            ->will($this->returnValue(false)); // This will raise the exception
+            ->will($this->onConsecutiveCalls(true, false)); // This will raise the exception
 
         $this->client->registerNewAccount('me@you.com', '+123456789', self::$keys['privatekey'], self::$keys['publickey']);
     }

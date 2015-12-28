@@ -4,6 +4,7 @@ namespace Octopuce\Acme;
 
 use Octopuce\Acme\ChallengeSolver\SolverInterface;
 use Octopuce\Acme\Exception\OwnershipNotFoundException;
+use Octopuce\Acme\Exception\ChallengeFailException;
 
 class Ownership extends AbstractEntity implements StorableInterface, OwnershipInterface
 {
@@ -117,6 +118,8 @@ class Ownership extends AbstractEntity implements StorableInterface, OwnershipIn
 
         $this->client->challengeOwnership($targetUrl, $solver->getType(), $token.'.'.$thumbprint, $this->getPrivateKey(), $this->getPublicKey());
 
+        // @todo : update storage ?
+
         return $this;
     }
 
@@ -189,7 +192,7 @@ class Ownership extends AbstractEntity implements StorableInterface, OwnershipIn
             'modified'   => $this->modified,
             'type'       => $this->type,
             'value'      => $this->value,
-            'url'        => '',
+            'url'        => $this->url,
             'challenges' => $this->challenges,
         );
     }

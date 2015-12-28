@@ -65,12 +65,11 @@ class GuzzleClient implements HttpClientInterface
         try {
             // Call directory endpoint
             $response = $this->guzzle->get($baseUrl . '/directory')->send();
-
-            return $this->processResponse($response);
-
         } catch (\Exception $e) {
             throw new ApiCallErrorException($e->getMessage(), 2);
         }
+
+        return $this->processResponse($response);
     }
 
     /**
@@ -96,8 +95,6 @@ class GuzzleClient implements HttpClientInterface
         );
 
         $response = $this->sendPostRequest($this->getUrl('new-authz'), $params, $privateKey, $publicKey);
-
-        $response = $this->processResponse($response);
 
         $responseData = json_decode((string) $response->getBody(), true);
         if (!array_key_exists('challenges', $responseData)) {
@@ -126,9 +123,42 @@ class GuzzleClient implements HttpClientInterface
             'keyAuthorization' => $keyAuth,
         );
 
-        return $this->processResponse(
-            $this->sendPostRequest($url, $params, $privateKey, $publicKey)
+        return $this->sendPostRequest($url, $params, $privateKey, $publicKey);
+    }
+
+    /**
+     * Request signing a certificate
+     *
+     * @param string $dercsr
+     * @param string $privateKey
+     * @param string $publicKey
+     *
+     * @return string
+     *
+     * @throws ApiBadResponseException
+     */
+    public function signCertificate($dercsr, $privateKey, $publicKey)
+    {
+        $params = array(
+            'resource' => 'new-cert',
+            'csr' => $dercsr,
         );
+
+        $response = $this->sendPostRequest($this->getUrl('new-cert'), $params, $privateKey, $publicKey);
+
+        if (!$output = (string) $response->getBody()) {
+
+            $headers = $response->getHeaders();
+
+            if (!$headers->offsetExists('location')) {
+                throw new ApiBadResponseException('No certificate in the response and no url received for download');
+            } else {
+                $output = $headers->get('location');
+            }
+        }
+
+        return $output;
+
     }
 
     /**
@@ -163,7 +193,7 @@ class GuzzleClient implements HttpClientInterface
             throw new ApiBadResponseException('Response does not contain "Location" header', 3);
         }
 
-        return $this->processResponse($response);
+        return $response;
     }
 
     /**
@@ -201,34 +231,11 @@ class GuzzleClient implements HttpClientInterface
                 $params['contact'][] = 'tel:'.$tel;
             }
 
-            $response = $this->sendPostRequest($signUrl, $params, $privateKey, $publicKey);
-
-            return $this->processResponse($response);
-
+            return $this->sendPostRequest($signUrl, $params, $privateKey, $publicKey);
         }
+
         // TODO: what shall we do if new-reg is OKAY but we couldn't sign the contract ?
         throw new NoContractInResponseException('Reponse does not contains terms of service information');
-    }
-
-    /**
-     * @param string $dercsr
-     *
-     * @return \Guzzle\Http\Message\Response
-     */
-    public function signCertificate($dercsr)
-    {
-        $params = array(
-            'resource' => 'new-cert',
-            'csr' => \JOSE_URLSafeBase64::encode($dercsr),
-        );
-
-        try {
-
-            return $this->guzzle->post($this->getUrl('new-cert'), null, $params)->send();
-
-        } catch (\Exception $e) {
-            throw new ApiCallErrorException($e->getMessage(), 2);
-        }
     }
 
     /**
@@ -276,19 +283,23 @@ class GuzzleClient implements HttpClientInterface
 
         try {
 
-            return  $this->guzzle->post(
+            $response =  $this->guzzle->post(
                 $url,
                 null,
                 $signedParams
             )->send();
 
+            return $this->processResponse($response);
+
         } catch (\Exception $e) {
 
             $error = $e->getMessage();
 
-            if ($e instanceof \Guzzle\Http\Exception) {
+            if ($e instanceof \Guzzle\Http\Exception\HttpException) {
                 $errorDetails = json_decode($e->getResponse()->getBody(true), true);
                 $error .= "\n[detail] ".$errorDetails['detail'];
+
+                $this->processResponse($e->getResponse());
             }
 
             throw new ApiCallErrorException($error, 2);
@@ -313,7 +324,7 @@ class GuzzleClient implements HttpClientInterface
         }
 
         // Update the nonce in DB & memory
-        $nonce = (string) $response->getHeaders()->get('replay-nonce');
+        $nonce = (string) $headers->get('replay-nonce');
 
         $this->storage->updateNonce($nonce);
         $this->nonce = $nonce;

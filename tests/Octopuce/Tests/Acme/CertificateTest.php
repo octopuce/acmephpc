@@ -2,7 +2,7 @@
 
 namespace Octopuce\Tests\Acme;
 
-class OwnershipTest extends \PHPUnit_Framework_TestCase
+class CertificateTest extends \PHPUnit_Framework_TestCase
 {
     protected $storageMock;
     protected $clientMock;
@@ -16,27 +16,27 @@ class OwnershipTest extends \PHPUnit_Framework_TestCase
             ->getMock();
 
         $this->clientMock = $this->getMockBuilder('\Octopuce\Acme\Http\HttpClientInterface')
-            ->setMethods(array('registerNewOwnerShip', 'getBody', 'getHeaders', 'get', 'offsetExists'))
+            ->setMethods(array('signCertificate'))
             ->getMock();
 
         $this->sslMock = $this->getMockBuilder('\Octopuce\Acme\Ssl\SslInterface')->getMock();
     }
 
-    public function testRegister()
+    public function testSign()
     {
+        $responseMock = $this->getMockBuilder('\Guzzle\Http\Message\Response')
+            ->disableOriginalConstructor()
+            ->setMethods(array('getHeaders', 'get', 'offsetExists', 'getBody'))
+            ->getMock();
+
         $this->clientMock
             ->expects($this->once())
-            ->method('registerNewOwnership')
-            ->will($this->returnSelf());
-        $this->clientMock
-            ->expects($this->once())
-            ->method('getHeaders')
-            ->will($this->returnSelf());
+            ->method('signCertificate')
+            ->will($this->returnValue($responseMock));
 
-
-        $ownership = new \Octopuce\Acme\Ownership($this->storageMock, $this->clientMock, $this->sslMock);
-        $ownership
+        $certificate = new \Octopuce\Acme\Certificate($this->storageMock, $this->clientMock, $this->sslMock);
+        $certificate
             ->setKeys('private', 'public')
-            ->register('my-domain.tld');
+            ->sign('my-domain.tld', array('sub.my-domain.tld'));
     }
 }

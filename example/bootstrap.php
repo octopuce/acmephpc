@@ -12,7 +12,7 @@ $config = array(
         'challenge' => array(
             'type' => 'http',
             'config' => array(
-                // The target to store the file
+                // The target where to store the file
                 'doc-root' => '/tmp/',
             ),
         ),
@@ -23,8 +23,15 @@ $config = array(
 $client = new \Octopuce\Acme\Client($config);
 
 // Make your calls !
-$client->newAccount('test107@sonntag.fr');
 
-// $client->newOwnership(23, 'sonntag.fr');
+// Works
+// $client->newAccount('test107@sonntag.fr');
 
-//$client->challengeOwnership(23, 'sonntag.fr');
+// Works
+// $client->newOwnership(1, 'sonntag.fr');
+
+// Works
+// $client->challengeOwnership(1, 'sonntag.fr');
+
+// Works
+// $client->signCertificate(1, 'sonntag.fr');

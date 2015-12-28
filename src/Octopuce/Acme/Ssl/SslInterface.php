@@ -17,45 +17,21 @@ interface SslInterface
     /**
      * Generate a $length bits RSA private key
      *
-     * @param  int    $lentgh Length of the key
+     * @param  int    $lentgh  Length of the key
      *
-     * @return string         The PEM-encoded version of the unprotected key.
+     * @return array           An array containing key pair in PEM format
+     *                         array ('publickey' => '..', 'privateKey' => '..').
      */
     public function generateRsaKey($length = 4096);
 
     /**
-     * Generate a CSR for the associated with the unprotected RSA private key
-     * for the specified FQDN. If alternate names are given, they will be
-     * added as X.509 attributes too.
+     * Generate a CSR for given fqdn & altnames
      *
-     * @param string   $privKey (as returned by genRsa())
-     * @param string   $fqdn
-     * @param array    $alternateNames
+     * @param string $fqdn
+     * @param array  $altNames
      *
-     * @return string  A PEM-encoded Certificate Request
+     * @return string The CSR in DER format
      */
-    public function generateCsr($privKey, $fqdn, array $alternateNames = array());
+    public function generateCsr($fqdn, array $altNames = array());
 
-    /**
-     * Check that the $cert certificate is a valid, non-expired, proper
-     * X.509 certificate. If some chained certificates are given, also check
-     * the chain up to a known CA, and if the RSA private key is given, also
-     * check that the cert correspond to the private key
-     *
-     * @param  string  $cert    The PEM-encoded X.509 certificate to check
-     * @param  string  $chain   The chained certificates.
-     * @param  string  $privKey The unprotected RSA key to check the cert against
-     *
-     * @return bool
-     */
-    public function checkCertificate($cert, $privKey = null);
-
-    /**
-     * Convert a PEM-encoded CSR into DER
-     *
-     * @param  string $pem
-     *
-     * @return string DER-encoded version of the same structure
-     */
-    public function pemToDer($pem);
 }

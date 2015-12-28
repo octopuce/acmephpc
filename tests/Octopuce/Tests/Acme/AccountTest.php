@@ -10,8 +10,9 @@ class AccountTest extends \PHPUnit_Framework_TestCase
 
     public function setUp()
     {
-        $this->storageMock = $this->getMockBuilder('\Octopuce\Acme\Storage\StorageInterface')
+        $this->storageMock = $this->getMockBuilder('\Octopuce\Acme\Storage\DoctrineDbal')
             ->setMethods(array('save'))
+            ->disableOriginalConstructor()
             ->getMock();
 
         $this->clientMock = $this->getMockBuilder('\Octopuce\Acme\Http\HttpClientInterface')

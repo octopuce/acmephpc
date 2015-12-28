@@ -2,20 +2,11 @@
 
 namespace Octopuce\Acme;
 
-use Octopuce\Acme\Storage\StorageInterface;
-use Octopuce\Acme\Http\HttpClientInterface;
-use Octopuce\Acme\Ssl\SslInterface;
 use Octopuce\Acme\Exception\CertificateNotFoundException;
+use Octopuce\Acme\Exception\ApiBadResponseException;
 
-
-class Certificate extends AbstractEntity implements CertificateInterface
+class Certificate extends AbstractEntity implements CertificateInterface, StorableInterface
 {
-    /**
-     * SslInterface instance
-     * @var SslInterface
-     */
-    private $ssl;
-
     /**
      * FQDN
      * @var string
@@ -29,50 +20,10 @@ class Certificate extends AbstractEntity implements CertificateInterface
     private $altNames = array();
 
     /**
-     * Certificate
+     * Certificate string
      * @var string
      */
     private $certificate;
-
-    /**
-     * Chain
-     * @var string
-     */
-    private $chain;
-
-    /**
-     * Valid from
-     * @var \DateTime
-     */
-    private $validFrom;
-
-    /**
-     * Valid until
-     * @var \DateTime
-     */
-    private $validUntil;
-
-    /**
-     * Status
-     * @var int
-     */
-    private $status = 0;
-
-    /**
-     * Constructor
-     * Override parent to add SSL dependency
-     *
-     * @param StorageInterface     $storage
-     * @param HttpClientInterface  $client
-     * @param int                  $id
-     * @param SslInterface         $ssl
-     */
-    public function __construct(StorageInterface $storage, HttpClientInterface $client, SslInterface $ssl)
-    {
-        parent::__construct($storage, $client);
-
-        $this->ssl = $ssl;
-    }
 
     /**
      * Sign a new certificate for a given fqdn and store it
@@ -82,7 +33,7 @@ class Certificate extends AbstractEntity implements CertificateInterface
      *
      * @return $this
      *
-     * @throws ApiCallException
+     * @throws ApiBadResponseException
      */
     public function sign($fqdn, array $altNames = array())
     {
@@ -92,37 +43,33 @@ class Certificate extends AbstractEntity implements CertificateInterface
             $this->checkFqdn($name);
         }
 
-        // Generate a proper CSR / KEY
-        $key = $this->ssl->generateRsaKey();
-        $csr = $this->ssl->generateCsr($key, $fqdn, $altNames);
-        $dercsr = $this->ssl->pemToDer($csr);
-
-        // Call API
-        $response = $this->client->signCertificate($dercsr);
-
-        var_dump($response);
-        die();
-
-        // Header 200 will be handled by Guzzle
-        if (isset($headers["HTTP"])) {
-            if ($headers["HTTP"][1] != "200") {
-                throw new AcmeException("Error " . $headers["HTTP"][1] . " when calling the API", 2);
-            }
-        }
-
-        // FIXME WHAT DO I GET BACK ??
-        $cert = array(
-            "key" => $key,
-            "csr" => $csr,
-            "crt" => $content["crt"],
-            "chain" => $content["chain"]
+        // Generate a proper CSR
+        $csr = $this->ssl->generateCsr(
+            $fqdn,
+            $altNames
         );
 
-        // store it along with contact information
-        $id = $this->db->setCert($cert);
-        $cert["id"] = $id;
-        return $cert;
+        // Call API
+        $response = $this->client->signCertificate(
+            \JOSE_URLSafeBase64::encode($csr),
+            $this->getPrivateKey(),
+            $this->getPublicKey()
+        );
+
+        // Certificate is available in the response
+        if ($certificate = (string) $response->getBody()) {
+
+            $this->certificate = $certificate;
+
+        } else {
+
+            // @todo : How to handle the postponed download ?
+            // Here we should find a header location with the download url
+        }
+
+        return $this;
     }
+
 
     public function revoke($fqdn)
     {
@@ -153,5 +100,20 @@ class Certificate extends AbstractEntity implements CertificateInterface
     public function save()
     {
         return $this->storage->save($this);
+    }
+
+    /**
+     * Get storable data
+     *
+     * @return array
+     */
+    public function getStorableData()
+    {
+        return array(
+            'id'          => $this->id,
+            'fqdn'        => $this->fqdn,
+            'altNames'    => $this->altNames,
+            'certificate' => $this->certificate,
+        );
     }
 }
