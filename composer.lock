@@ -4,8 +4,8 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "hash": "305a2c89dd05af110218626a0e292010",
-    "content-hash": "8064064af87f0877fc10dc6759e7bb69",
+    "hash": "8380b54e565f7c4e27376c4d396c4ad2",
+    "content-hash": "2f2ab0291c5e0b763b1da8fff468be1a",
     "packages": [
         {
             "name": "doctrine/annotations",
@@ -713,16 +713,16 @@
         },
         {
             "name": "pimple/pimple",
-            "version": "v3.0.2",
+            "version": "v1.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/silexphp/Pimple.git",
-                "reference": "a30f7d6e57565a2e1a316e1baf2a483f788b258a"
+                "reference": "2019c145fe393923f3441b23f29bbdfaa5c58c4d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/silexphp/Pimple/zipball/a30f7d6e57565a2e1a316e1baf2a483f788b258a",
-                "reference": "a30f7d6e57565a2e1a316e1baf2a483f788b258a",
+                "url": "https://api.github.com/repos/silexphp/Pimple/zipball/2019c145fe393923f3441b23f29bbdfaa5c58c4d",
+                "reference": "2019c145fe393923f3441b23f29bbdfaa5c58c4d",
                 "shasum": ""
             },
             "require": {
@@ -731,12 +731,12 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "3.0.x-dev"
+                    "dev-master": "1.1.x-dev"
                 }
             },
             "autoload": {
                 "psr-0": {
-                    "Pimple": "src/"
+                    "Pimple": "lib/"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -749,13 +749,13 @@
                     "email": "fabien@symfony.com"
                 }
             ],
-            "description": "Pimple, a simple Dependency Injection Container",
+            "description": "Pimple is a simple Dependency Injection Container for PHP 5.3",
             "homepage": "http://pimple.sensiolabs.org",
             "keywords": [
                 "container",
                 "dependency injection"
             ],
-            "time": "2015-09-11 15:10:35"
+            "time": "2013-11-22 08:30:29"
         },
         {
             "name": "psr/log",

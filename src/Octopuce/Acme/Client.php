@@ -2,11 +2,10 @@
 
 namespace Octopuce\Acme;
 
-use Pimple\Container;
 use Octopuce\Acme\Exception\ApiCallErrorException;
 use Octopuce\Acme\Exception\ApiBadResponseException;
 
-class Client extends Container implements ClientInterface
+class Client extends \Pimple implements ClientInterface
 {
     /**
      * User agent string
@@ -49,41 +48,41 @@ class Client extends Container implements ClientInterface
     {
         $values = array_replace_recursive($this->defaultValues, $values);
 
-        $this['storage'] = function ($c) {
+        $this['storage'] = $this->share(function ($c) {
             return new Storage\DoctrineDbal($c['params']['database'], $c['params']['table_prefix']);
-        };
+        });
 
-        $this['rsa'] = function () {
+        $this['rsa'] = $this->share(function () {
             return new \phpseclib\Crypt\RSA;
-        };
+        });
 
-        $this['ssl'] = function ($c) {
+        $this['ssl'] = $this->share(function ($c) {
             return new Ssl\PhpSecLib($c->raw('rsa'));
-        };
+        });
 
-        $this['http-client'] = function ($c) {
+        $this['http-client'] = $this->share(function ($c) {
             return new Http\GuzzleClient(
                 new \Guzzle\Http\Client,
                 $c->raw('rsa'),
                 $c['storage']
             );
-        };
+        });
 
-        $this['certificate'] = function ($c) {
+        $this['certificate'] = $this->share(function ($c) {
             return new Certificate($c['storage'], $c['http-client'], $c['ssl']);
-        };
+        });
 
-        $this['account'] = function ($c) {
+        $this['account'] = $this->share(function ($c) {
             return new Account($c['storage'], $c['http-client'], $c['ssl']);
-        };
+        });
 
-        $this['ownership'] = function ($c) {
+        $this['ownership'] = $this->share(function ($c) {
             return new Ownership($c['storage'], $c['http-client'], $c['ssl']);
-        };
+        });
 
-        $this['challenge-solver-http'] = function ($c) {
+        $this['challenge-solver-http'] = $this->share(function ($c) {
             return new \Octopuce\Acme\ChallengeSolver\Http($c['params']['challenge']['config']);
-        };
+        });
         /*
         $this['challenge-solver-dns'] = function () {
             return new Octopuce\Acme\ChallengeSolver\Dns;
