@@ -43,37 +43,82 @@ class Certificate extends AbstractEntity implements CertificateInterface, Storab
             $this->checkFqdn($name);
         }
 
+        $this->fqdn     = $fqdn;
+        $this->altNames = $altNames;
+
         // Generate a proper CSR
         $csr = $this->ssl->generateCsr(
             $fqdn,
             $altNames
         );
 
-        // Call API
-        $response = $this->client->signCertificate(
-            \JOSE_URLSafeBase64::encode($csr),
-            $this->getPrivateKey(),
-            $this->getPublicKey()
-        );
+        // Call API and save
+        try {
 
-        // Certificate is available in the response
-        if ($certificate = (string) $response->getBody()) {
+            $this->certificate = $this->client->signCertificate(
+                \JOSE_URLSafeBase64::encode($csr),
+                $this->getPrivateKey(),
+                $this->getPublicKey()
+            );
 
-            $this->certificate = $certificate;
+            $this->save('certificate');
 
-        } else {
+        } catch (CertificateNotYetAvailableException $e) {
+            // @todo: handle retry here
+            $retryUrl = $e->getMessage();
 
-            // @todo : How to handle the postponed download ?
-            // Here we should find a header location with the download url
         }
 
         return $this;
     }
 
+    /**
+     * Find a certificate by domain name
+     *
+     * @param string $fqdn
+     *
+     * @return $this
+     *
+     * @throws CertificateNotFoundException
+     */
+    public function findByDomainName($fqdn)
+    {
+        $this->checkFqdn($fqdn);
 
+        $data = $this->storage->findCertificateByDomain($fqdn);
+
+        if (empty($data)) {
+            throw new CertificateNotFoundException(
+                sprintf('Unable to find certificate matching %s domain name', $fqdn),
+                12
+            );
+        }
+
+        return $this->setDataFromArray($data);
+    }
+
+    /**
+     * Revoke a certificate
+     *
+     * @param string $fqdn
+     *
+     * @return $this
+     */
     public function revoke($fqdn)
     {
+        $this->findByDomainName($fqdn);
 
+        $response = $this->client->revokeCertificate(
+            \JOSE_URLSafeBase64::encode($this->certificate),
+            $this->getPrivateKey(),
+            $this->getPublicKey()
+        );
+
+        $this->storage->delete($this, 'certificate');
+
+        print_r($response);
+
+        return $this;
     }
 
     public function update($fqdn)
@@ -82,16 +127,20 @@ class Certificate extends AbstractEntity implements CertificateInterface, Storab
     }
 
     /**
+     * Set data from array
      *
-     * @throws CertificateNotFoundException
+     * @param array $data
+     *
+     * @return $this
      */
-    private function load()
+    private function setDataFromArray(array $data)
     {
-        $data = $this->storage->loadCertificate($this->id);
+        $this->id          = $data['id'];
+        $this->fqdn        = $data['fqdn'];
+        $this->altNames    = $data['altNames'];
+        $this->certificate = base64_decode($data['certificate']);
 
-        if (empty($data)) {
-            throw new CertificateNotFoundException('Certificate could not be found !', 12);
-        }
+        return $this;
     }
 
     /**
@@ -105,7 +154,18 @@ class Certificate extends AbstractEntity implements CertificateInterface, Storab
             'id'          => $this->id,
             'fqdn'        => $this->fqdn,
             'altNames'    => $this->altNames,
-            'certificate' => $this->certificate,
+            'certificate' => base64_encode($this->certificate),
         );
     }
+
+    /**
+     * Get certificate content
+     *
+     * @return string
+     */
+    public function __toString()
+    {
+        return $this->certificate;
+    }
+
 }

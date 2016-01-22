@@ -9,6 +9,7 @@ use Octopuce\Acme\Exception\WrongOperationException;
 use Octopuce\Acme\Exception\ApiCallErrorException;
 use Octopuce\Acme\Exception\ApiBadResponseException;
 use Octopuce\Acme\Exception\NoContractInResponseException;
+use Octopuce\Acme\Exception\CertificateNotYetAvailableException;
 
 class GuzzleClient implements HttpClientInterface
 {
@@ -73,14 +74,7 @@ class GuzzleClient implements HttpClientInterface
     }
 
     /**
-     * Register new ownership
-     *
-     * @param string $value
-     * @param string $type
-     * @param string $privateKey
-     * @param string $publicKey
-     *
-     * @return \Guzzle\Http\Message\Response
+     * {@inheritDoc}
      *
      * @throws ApiBadResponseException
      */
@@ -105,15 +99,7 @@ class GuzzleClient implements HttpClientInterface
     }
 
     /**
-     * Challenge Ownership
-     *
-     * @param string $url
-     * @param string $type
-     * @param string $keyAuth
-     * @param string $privateKey
-     * @param string $publicKey
-     *
-     * @return \Guzzle\Http\Message\Response
+     * {@inheritDoc}
      */
     public function challengeOwnership($url, $type, $keyAuth, $privateKey, $publicKey)
     {
@@ -127,13 +113,7 @@ class GuzzleClient implements HttpClientInterface
     }
 
     /**
-     * Request signing a certificate
-     *
-     * @param string $dercsr
-     * @param string $privateKey
-     * @param string $publicKey
-     *
-     * @return string
+     * {@inheritdoc}
      *
      * @throws ApiBadResponseException
      */
@@ -153,23 +133,30 @@ class GuzzleClient implements HttpClientInterface
             if (!$headers->offsetExists('location')) {
                 throw new ApiBadResponseException('No certificate in the response and no url received for download');
             } else {
-                $output = $headers->get('location');
+                throw new CertificateNotYetAvailableException($headers->get('location'));
             }
         }
 
         return $output;
-
     }
 
     /**
-     * Register new account
+     * {@inheritdoc}
      *
-     * @param string $mailto
-     * @param string $tel
-     * @param string $privateKey
-     * @param string $publicKey
-     *
-     * @return \Guzzle\Http\Message\Response
+     * @throws ApiBadResponseException
+     */
+    public function revokeCertificate($cert, $privateKey, $publicKey)
+    {
+        $params = array(
+            'resource' => 'revoke-cert',
+            'certificate' => $cert,
+        );
+
+        return $this->sendPostRequest($this->getUrl('revoke-cert'), $params, $privateKey, $publicKey);
+    }
+
+    /**
+     * {@inheritdoc}
      *
      * @throws ApiBadResponseException
      */
@@ -197,15 +184,29 @@ class GuzzleClient implements HttpClientInterface
     }
 
     /**
-     * Sign a contract using a previous registration response
-     *
-     * @param \Guzzle\Http\Message\Response  $response
-     * @param string                         $mailto
-     * @param string                         $tel
-     * @param string                         $privateKey
-     * @param string                         $publicKey
-     *
-     * @return \Guzzle\Http\Message\Response
+     * {@inheritdoc}
+     */
+    public function recoverAccount($mailto, $tel, $privateKey, $publicKey)
+    {
+        $params = array(
+            'resource' => 'recover-reg',
+            'method'   => 'contact',
+            'base'     => '',
+            'contact' => array(
+                'mailto:'.$mailto,
+            ),
+        );
+
+        if (!empty($tel)) {
+            $params['contact'][] = 'tel:'.$tel;
+        }
+
+        $response = $this->sendPostRequest('https://acme-staging.api.letsencrypt.org/recover-reg', $params, $privateKey, $publicKey);
+
+    }
+
+    /**
+     * {@inheritdoc}
      *
      * @throws NoContractInResponseException
      */

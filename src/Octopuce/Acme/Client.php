@@ -4,6 +4,8 @@ namespace Octopuce\Acme;
 
 use Octopuce\Acme\Exception\ApiCallErrorException;
 use Octopuce\Acme\Exception\ApiBadResponseException;
+use Octopuce\Acme\Exception\AccountNotFoundException;
+use Symfony\Component\Finder\Finder;
 
 class Client extends \Pimple implements ClientInterface
 {
@@ -23,15 +25,21 @@ class Client extends \Pimple implements ClientInterface
      */
     private $defaultValues = array(
         'params' => array(
-            'table_prefix' => 'acme',
-            'database' => '',
             'api' => 'https://acme.api.letsencrypt.org',
+            'storage' => array(
+                'type' => 'filesystem',
+                'database' => array(
+                    'dsn' => '',
+                    'table_prefix' => 'acme',
+                ),
+            ),
             'challenge' => array(
                 'type' => 'http',
                 'config' => array(
                     'doc-root' => '',
                 ),
             ),
+            'account' => null,
         ),
     );
 
@@ -46,21 +54,33 @@ class Client extends \Pimple implements ClientInterface
      */
     public function __construct(array $values = array())
     {
-        $values = array_replace_recursive($this->defaultValues, $values);
+        $this->defaultValues['params']['storage']['filesystem'] = __DIR__.'/../../../var';
 
-        $this['storage'] = $this->share(function ($c) {
-            return new Storage\DoctrineDbal($c['params']['database'], $c['params']['table_prefix']);
+        $values['storage'] = $this->share(function ($c) {
+            $factory = new Storage\Factory(array(
+                'filesystem' => function () use ($c) {
+                    return new Storage\FileSystem($c['params']['storage']['filesystem'], new Finder);
+                },
+                'database' => function () use ($c) {
+                    return new Storage\DoctrineDbal(
+                        $c['params']['storage']['database']['dsn'],
+                        $c['params']['storage']['database']['table_prefix']
+                    );
+                },
+            ));
+
+            return $factory->create($c['params']['storage']['type']);
         });
 
-        $this['rsa'] = $this->share(function () {
+        $values['rsa'] = function () {
             return new \phpseclib\Crypt\RSA;
-        });
+        };
 
-        $this['ssl'] = $this->share(function ($c) {
+        $values['ssl'] = $this->share(function ($c) {
             return new Ssl\PhpSecLib($c->raw('rsa'));
         });
 
-        $this['http-client'] = $this->share(function ($c) {
+        $values['http-client'] = $this->share(function ($c) {
             return new Http\GuzzleClient(
                 new \Guzzle\Http\Client,
                 $c->raw('rsa'),
@@ -68,33 +88,34 @@ class Client extends \Pimple implements ClientInterface
             );
         });
 
-        $this['certificate'] = $this->share(function ($c) {
+        $values['certificate'] = $this->share(function ($c) {
             return new Certificate($c['storage'], $c['http-client'], $c['ssl']);
         });
 
-        $this['account'] = $this->share(function ($c) {
+        $values['account'] = $this->share(function ($c) {
             return new Account($c['storage'], $c['http-client'], $c['ssl']);
         });
 
-        $this['ownership'] = $this->share(function ($c) {
+        $values['ownership'] = function ($c) {
             return new Ownership($c['storage'], $c['http-client'], $c['ssl']);
-        });
+        };
 
-        $this['challenge-solver-http'] = $this->share(function ($c) {
+        $values['challenge-solver-http'] = $this->share(function ($c) {
             return new \Octopuce\Acme\ChallengeSolver\Http($c['params']['challenge']['config']);
         });
         /*
-        $this['challenge-solver-dns'] = function () {
+        $values['challenge-solver-dns'] = $this->share(function () {
             return new Octopuce\Acme\ChallengeSolver\Dns;
-        };
-        $this['challenge-solver-dvsni'] = function () {
+        });
+        $values['challenge-solver-dvsni'] = $this->share(function () {
             return new Octopuce\Acme\ChallengeSolver\DvSni;
-        };
+        });
         */
 
+        // Override default values with provided config
+        $values = array_replace_recursive($this->defaultValues, $values);
+
         parent::__construct($values);
-
-
     }
 
     /**
@@ -106,7 +127,7 @@ class Client extends \Pimple implements ClientInterface
     {
         if (!$this->initialized) {
 
-            // Load nonce from database and check for validity
+            // Load nonce from storage and check for validity
             $status = $this['storage']->loadStatus();
 
             if (empty($status['nonce']) || $status['noncets'] < (time() - self::NONCE_MAX_AGE)) {
@@ -127,6 +148,15 @@ class Client extends \Pimple implements ClientInterface
                 ->setNonce($status['nonce']);
 
             $this->initialized = true;
+
+            if (!empty($this['params']['account'])) {
+                try {
+                    $this['account']->load($this['params']['account']);
+                } catch (AccountNotFoundException $e) {
+                    $this->newAccount($this['params']['account']);
+                }
+            }
+
         }
 
         return $this;
@@ -141,6 +171,20 @@ class Client extends \Pimple implements ClientInterface
     {
         // Call directory endpoint
         return $this['http-client']->enumerate($this['params']['api']);
+    }
+
+    /**
+     * Load account
+     *
+     * @param string $mailto Email of the account to be loaded
+     *
+     * @return $this
+     */
+    public function loadAccount($mailto)
+    {
+        $this['account']->load($mailto);
+
+        return $this;
     }
 
     /**
@@ -174,16 +218,15 @@ class Client extends \Pimple implements ClientInterface
     /**
      * Ask for new ownership
      *
-     * @param int    $accountId  Id of account
-     * @param string $value      Value of ownership (usually a fqdn)
+     * @param string $value Value of ownership (usually a fqdn)
      *
      * @return $this
      */
-    public function newOwnership($accountId, $value)
+    public function newOwnership($value)
     {
         $this->init();
 
-        $account = $this['account']->load($accountId);
+        $account = $this['account'];
 
         $this['ownership']
             ->setKeys($account->getPrivateKey(), $account->getPublicKey())
@@ -193,27 +236,46 @@ class Client extends \Pimple implements ClientInterface
     }
 
     /**
+     * Get challenge data to solve it manually
+     *
+     * @param string $fqdn                   FQDN
+     * @param string $overrideChallengeType  Force this challenge type (use config if empty)
+     *
+     * @return array The data needed to solve the challenge
+     */
+    public function getChallengeData($fqdn, $overrideChallengeType = null)
+    {
+        $challengeSolver = $this->getChallengeSolver($overrideChallengeType);
+
+        $this->init();
+
+        $account = $this['account'];
+
+        return $this['ownership']
+            ->setKeys($account->getPrivateKey(), $account->getPublicKey())
+            ->getChallengeData(
+                $challengeSolver,
+                $fqdn
+            );
+    }
+
+    /**
      * Challenge an existing ownership
      *
-     * @param int    $accountId  Id of account
-     * @param string $fqdn       FQDN to challenge
+     * @param string $fqdn                   FQDN to challenge
+     * @param string $overrideChallengeType  Force this challenge type (use config if empty)
      *
      * @return $this
      *
      * @throws \InvalidArgumentException
      */
-    public function challengeOwnership($accountId, $fqdn)
+    public function challengeOwnership($fqdn, $overrideChallengeType = null)
     {
-        try {
-            $challengeType = $this['params']['challenge']['type'];
-            $challengeSolver = $this->offsetGet('challenge-solver-'.$challengeType);
-        } catch (\Exception $e) {
-            throw new \InvalidArgumentException(sprintf('Challenge solver type %s is not supported', $challengeType));
-        }
+        $challengeSolver = $this->getChallengeSolver($overrideChallengeType);
 
         $this->init();
 
-        $account = $this['account']->load($accountId);
+        $account = $this['account'];
 
         $this['ownership']
             ->setKeys($account->getPrivateKey(), $account->getPublicKey())
@@ -226,34 +288,86 @@ class Client extends \Pimple implements ClientInterface
     }
 
     /**
-     * Sign a certificate for specified fqdn
+     * Get the challenge solver instance
      *
-     * @param int    $accountId  Id of account
+     * @param string $forceType
+     *
+     * @return \Octopuce\Acme\ChallengeSolver\SolverInterface
+     */
+    private function getChallengeSolver($forceType)
+    {
+        try {
+            $challengeType = $this['params']['challenge']['type'];
+            if (null !== $forceType) {
+                $challengeType = $forceType;
+            }
+
+            $challengeSolver = $this->offsetGet('challenge-solver-'.$challengeType);
+
+        } catch (\Exception $e) {
+            throw new \InvalidArgumentException(sprintf('Challenge solver type %s is not supported', $challengeType));
+        }
+
+        return $challengeSolver;
+    }
+
+    /**
+     * Sign a certificate for specified FQDN
+     *
      * @param string $fqdn       FQDN to challenge
      * @param array  $altNames   Alternative names
      *
-     * @return $this
+     * @return string The certificate content
      */
-    public function signCertificate($accountId, $fqdn, array $altNames = array())
+    public function signCertificate($fqdn, array $altNames = array())
     {
         $this->init();
 
-        $account = $this['account']->load($accountId);
+        $account = $this['account'];
 
-        $certificate = $this['certificate']
+        return (string) $this['certificate']
             ->setKeys($account->getPrivateKey(), $account->getPublicKey())
-            ->sign($fqdn)
-            ->save();
+            ->sign($fqdn);
+    }
+
+    /**
+     * Get the certificate for a given FQDN
+     *
+     * @return string The certificate content
+     */
+    public function getCertificate($fqdn)
+    {
+        return (string) $this['certificate']->findByDomainName($fqdn);
+    }
+
+    /**
+     * Revoke certificate for specified FQDN
+     *
+     * @param string $fqdn
+     *
+     * @return $this
+     */
+    public function revokeCertificate($fqdn)
+    {
+        $this->init();
+
+        $account = $this['account'];
+
+        $this['certificate']
+            ->setKeys($account->getPrivateKey(), $account->getPublicKey())
+            ->revoke($fqdn);
 
         return $this;
     }
 
-    public function revokeCertificate($id)
-    {
-        return $this['certificate']->revoke($id);
-    }
-
-    public function updateCertificate($id)
+    /**
+     * Renew certificate for specified FQDN
+     *
+     * @param string $fqdn
+     *
+     * @return string The new certificate content
+     */
+    public function renewCertificate($fqdn)
     {
 
     }

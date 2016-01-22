@@ -7,31 +7,53 @@ $autoload = require __DIR__.'/../vendor/autoload.php';
  */
 $config = array(
     'params' => array(
-        'database' => 'mysql://letsencrypt:le2015@localhost/letsencrypt',
         'api' => 'https://acme-staging.api.letsencrypt.org',
+        'storage' => array(
+            // The storage type to use
+            'type' => 'filesystem',
+            // Storage config
+            'filesystem' => __DIR__.'/../storage',
+            'database' => array('dsn' => 'mysql://letsencrypt:le2015@localhost/letsencrypt'),
+        ),
         'challenge' => array(
             'type' => 'http',
             'config' => array(
-                // The target where to store the file
-                'doc-root' => '/tmp/',
+                // The target to store the file
+                'target-path' => '/tmp/',
             ),
         ),
+        // Default account to be used
+        'account' => 'me@you.com',
     ),
 );
+
 
 // Get client
 $client = new \Octopuce\Acme\Client($config);
 
 // Make your calls !
 
-// Works
+// Works but needed only if no default account in config
 // $client->newAccount('test107@sonntag.fr');
 
-// Works
-// $client->newOwnership(1, 'sonntag.fr');
+// Works but needed only if no default account in config
+// $client->loadAccount('test107@sonntag.fr');
 
 // Works
-// $client->challengeOwnership(1, 'sonntag.fr');
+// $client->newOwnership('sonntag.fr');
 
 // Works
-// $client->signCertificate(1, 'sonntag.fr');
+// $client->getChallengeData('sonntag.fr');
+// $client->getChallengeData('sonntag.fr', 'http-01'); /// Can override challenge type for each call
+
+// Works
+// $client->challengeOwnership('sonntag.fr');
+
+// Works
+// $client->signCertificate('sonntag.fr');
+
+// Works
+// $client->getCertificate('sonntag.fr');
+
+// Works
+// $client->revokeCertificate('sonntag.fr');

@@ -166,12 +166,12 @@ abstract class AbstractEntity
     /**
      * Save object into storage
      *
-     * @param string $tableKey
+     * @param string $type
      *
      * @return int Id of the saved object
      */
-    public function save($tableKey)
+    public function save($type)
     {
-        return $this->storage->save($this, $tableKey);
+        return $this->storage->save($this, $type);
     }
 }

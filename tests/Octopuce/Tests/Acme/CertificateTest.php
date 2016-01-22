@@ -10,13 +10,11 @@ class CertificateTest extends \PHPUnit_Framework_TestCase
 
     public function setUp()
     {
-        $this->storageMock = $this->getMockBuilder('\Octopuce\Acme\Storage\DoctrineDbal')
-            ->setMethods(array('save'))
+        $this->storageMock = $this->getMockBuilder('\Octopuce\Acme\Storage\StorageInterface')
             ->disableOriginalConstructor()
             ->getMock();
 
         $this->clientMock = $this->getMockBuilder('\Octopuce\Acme\Http\HttpClientInterface')
-            ->setMethods(array('signCertificate'))
             ->getMock();
 
         $this->sslMock = $this->getMockBuilder('\Octopuce\Acme\Ssl\SslInterface')->getMock();

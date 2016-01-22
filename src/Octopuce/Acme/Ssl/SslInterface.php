@@ -34,4 +34,19 @@ interface SslInterface
      */
     public function generateCsr($fqdn, array $altNames = array());
 
+    /**
+     * Return a new RSA object instance
+     *
+     * @return \phpseclib\Crypt\RSA
+     */
+    public function getRsa();
+
+    /**
+     * Get the thumbprint of a RSA public key
+     *
+     * @param string $publicKey
+     *
+     * @return string
+     */
+    public function getPublicKeyThumbprint($publicKey);
 }

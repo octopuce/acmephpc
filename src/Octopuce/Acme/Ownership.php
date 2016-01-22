@@ -33,6 +33,24 @@ class Ownership extends AbstractEntity implements StorableInterface, OwnershipIn
     private $challenges;
 
     /**
+     * Challenge url
+     * @var string
+     */
+    private $challengeUrl;
+
+    /**
+     * Token info for challenge
+     * @var string
+     */
+    private $challengeToken;
+
+    /**
+     * Key thumbprint for challenge
+     * @var string
+     */
+    private $challengeThumbprint;
+
+    /**
      * Register a new ownership
      *
      * @param string  $fqdn    Domain name
@@ -67,22 +85,15 @@ class Ownership extends AbstractEntity implements StorableInterface, OwnershipIn
     }
 
     /**
-     * Challenge
+     * Get the challenge data for later use
      *
      * @param SolverInterface $solver
      * @param string          $fqdn
      *
-     * @return $this
-     *
-     * @throws \UnexpectedValueException
-     * @throws ChallengeFailException
+     * @return array An array containing
      */
-    public function challenge(SolverInterface $solver, $fqdn)
+    public function getChallengeData(SolverInterface $solver, $fqdn)
     {
-        $rsa = $this->ssl->getRsa();
-        $rsa->loadKey($this->getPublicKey());
-        $thumbprint = \JOSE_JWK::encode($rsa)->thumbprint();
-
         $this->loadByDomain($fqdn);
 
         $token = null;
@@ -98,13 +109,13 @@ class Ownership extends AbstractEntity implements StorableInterface, OwnershipIn
                     throw new \UnexpectedValueException('Challenge is not in pending status');
                 }
 
-                $targetUrl = $challenge['uri'];
-                $token = $challenge['token'];
+                $this->challengeUrl = $challenge['uri'];
+                $this->challengeToken = $challenge['token'];
                 break;
             }
         }
 
-        if (null === $token || null == $targetUrl) {
+        if (null === $this->challengeToken || null == $this->challengeUrl) {
             throw new \RuntimeException(sprintf(
                 'Challenge type %s not found for current ownership, available challenges are : %s',
                 $solver->getType(),
@@ -112,11 +123,38 @@ class Ownership extends AbstractEntity implements StorableInterface, OwnershipIn
             ));
         }
 
-        if (!$solver->solve($token, $thumbprint)) {
+        $this->challengeThumbprint = $this->ssl->getPublicKeyThumbprint($this->getPublicKey());
+
+        return $solver->getChallengeInfo($fqdn, $this->challengeToken, $this->challengeThumbprint);
+    }
+
+
+    /**
+     * Challenge
+     *
+     * @param SolverInterface $solver
+     * @param string          $fqdn
+     *
+     * @return $this
+     *
+     * @throws \UnexpectedValueException
+     * @throws ChallengeFailException
+     */
+    public function challenge(SolverInterface $solver, $fqdn)
+    {
+        $challengeData = $this->getChallengeData($solver, $fqdn);
+
+        if (!$solver->solve($this->challengeToken, $this->challengeThumbprint)) {
             throw new ChallengeFailException('Unable to solve challenge');
         }
 
-        $this->client->challengeOwnership($targetUrl, $solver->getType(), $token.'.'.$thumbprint, $this->getPrivateKey(), $this->getPublicKey());
+        $this->client->challengeOwnership(
+            $this->challengeUrl,
+            $solver->getType(),
+            $this->challengeToken.'.'.$this->challengeThumbprint,
+            $this->getPrivateKey(),
+            $this->getPublicKey()
+        );
 
         // @todo : update storage ?
 

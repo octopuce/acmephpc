@@ -10,20 +10,30 @@ class AccountTest extends \PHPUnit_Framework_TestCase
 
     public function setUp()
     {
-        $this->storageMock = $this->getMockBuilder('\Octopuce\Acme\Storage\DoctrineDbal')
-            ->setMethods(array('save'))
-            ->disableOriginalConstructor()
+        $this->storageMock = $this->getMockBuilder('\Octopuce\Acme\Storage\StorageInterface')
             ->getMock();
 
         $this->clientMock = $this->getMockBuilder('\Octopuce\Acme\Http\HttpClientInterface')
-            ->setMethods(array('registerNewAccount', 'signContract'))
             ->getMock();
 
-        $this->sslMock = $this->getMockBuilder('\Octopuce\Acme\Ssl\SslInterface')->getMock();
+        $this->sslMock = $this->getMockBuilder('\Octopuce\Acme\Ssl\SslInterface')
+            ->getMock();
     }
 
     public function testRegister()
     {
+        $responseMock = $this->getMockBuilder('\Guzzle\Http\Message\Response')
+            ->disableOriginalConstructor()
+            ->setMethods(array('getHeaders', 'get', 'offsetExists', 'getBody'))
+            ->getMock();
+
+        $responseMock->expects($this->once())
+            ->method('getHeaders')
+            ->will($this->returnSelf());
+        $responseMock->expects($this->once())
+            ->method('offsetExists')
+            ->will($this->returnValue(true));
+
         $this->storageMock
             ->expects($this->exactly(3))
             ->method('save')
@@ -32,7 +42,7 @@ class AccountTest extends \PHPUnit_Framework_TestCase
         $this->clientMock
             ->expects($this->once())
             ->method('registerNewAccount')
-            ->will($this->returnSelf());
+            ->will($this->returnValue($responseMock));
 
         $this->clientMock
             ->expects($this->once())

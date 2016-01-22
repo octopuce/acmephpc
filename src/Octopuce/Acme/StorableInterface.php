@@ -12,6 +12,13 @@ interface StorableInterface
     public function getId();
 
     /**
+     * Get type
+     *
+     * @return string
+     */
+    //public function getType();
+
+    /**
      * Returns an associative array (name => value) of data to be persisted
      *
      * @return array

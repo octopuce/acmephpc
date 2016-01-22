@@ -114,11 +114,11 @@ class DoctrineDbal implements StorageInterface
      *
      * @param string $nonce
      *
-     * @return int
+     * @return bool
      */
     public function updateNonce($nonce)
     {
-        return $this->con
+        return (bool) $this->con
             ->createQueryBuilder()
             ->update($this->tables['status'])
             ->set('nonce', ':nonce')
@@ -148,7 +148,8 @@ class DoctrineDbal implements StorageInterface
     /**
      * Find any object by Id
      *
-     * @param int $id
+     * @param int    $id
+     * @param string $type
      *
      * @return array|false
      */
@@ -168,18 +169,18 @@ class DoctrineDbal implements StorageInterface
      * Save an object into DB
      *
      * @param StorableInterface $obj
-     * @param string            $tableKey
+     * @param string            $type
      *
      * @return int The object ID
      */
-    public function save(StorableInterface $obj, $tableKey)
+    public function save(StorableInterface $obj, $type)
     {
         // If object has ID, update
         if ($obj->getId() !== null) {
-            $this->update($obj, $tableKey);
+            $this->update($obj, $type);
         } else {
             // otherwise insert it
-            $id = $this->insert($obj, $tableKey);
+            $id = $this->insert($obj, $type);
             $obj->setId($id);
         }
 
@@ -190,15 +191,15 @@ class DoctrineDbal implements StorageInterface
      * Update object
      *
      * @param StorableInterface $obj
-     * @param string            $tableKey
+     * @param string            $type
      *
      * @return void
      */
-    protected function update(StorableInterface $obj, $tableKey)
+    protected function update(StorableInterface $obj, $type)
     {
         $qb = $this->con
             ->createQueryBuilder()
-            ->update($this->tables[$tableKey])
+            ->update($this->tables[$type])
             ->where('id = :id')
             ->setParameter('id', $obj->getId(), \PDO::PARAM_INT);
 
@@ -213,11 +214,11 @@ class DoctrineDbal implements StorageInterface
      * Insert object
      *
      * @param StorableInterface $obj
-     * @param string            $tableKey
+     * @param string            $type
      *
      * @return int
      */
-    protected function insert(StorableInterface $obj, $tableKey)
+    protected function insert(StorableInterface $obj, $type)
     {
         $insertParams = array();
         foreach ($obj->getStorableData() as $name => $value) {
@@ -225,7 +226,7 @@ class DoctrineDbal implements StorageInterface
         }
 
         $this->con->insert(
-            $this->tables[$tableKey],
+            $this->tables[$type],
             $insertParams
         );
 

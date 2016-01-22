@@ -20,11 +20,11 @@ interface StorageInterface
      * Save entity
      *
      * @param StorableInterface $obj
-     * @param string            $tableKey
+     * @param string            $type
      *
      * @return int The object ID
      */
-    public function save(StorableInterface $obj, $tableKey);
+    public function save(StorableInterface $obj, $type);
 
     /**
      * Load status
@@ -44,6 +44,15 @@ interface StorageInterface
     public function updateStatus($nonce, $apiUrls);
 
     /**
+     * Update nonce
+     *
+     * @param string $nonce
+     *
+     * @return bool
+     */
+    public function updateNonce($nonce);
+
+    /**
      * Find any object by Id
      *
      * @param int $id
@@ -51,4 +60,13 @@ interface StorageInterface
      * @return array|false
      */
     public function findById($id, $type);
+
+    /**
+     * Find ownership by domain
+     *
+     * @param string $domain
+     *
+     * @return array|false
+     */
+    public function findOwnershipByDomain($domain);
 }

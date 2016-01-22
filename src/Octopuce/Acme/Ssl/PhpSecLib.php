@@ -78,7 +78,7 @@ class Phpseclib implements SslInterface
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function checkCertificate($cert, $privKey = null)
     {
@@ -86,10 +86,21 @@ class Phpseclib implements SslInterface
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function getRsa()
     {
         return $this->rsa->__invoke();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getPublicKeyThumbprint($publicKey)
+    {
+        $rsa = $this->getRsa();
+        $rsa->loadKey($publicKey);
+
+        return \JOSE_JWK::encode($rsa)->thumbprint();
     }
 }

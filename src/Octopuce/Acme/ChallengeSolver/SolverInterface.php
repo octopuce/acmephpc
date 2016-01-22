@@ -23,4 +23,15 @@ interface SolverInterface
      * @return string
      */
     public function getType();
+
+    /**
+     * Get challenge info as text
+     *
+     * @param string $fqdn
+     * @param string $token
+     * @param string $publicKey
+     *
+     * @return array
+     */
+    public function getChallengeInfo($fqdn, $token, $publicKey);
 }

@@ -2,9 +2,15 @@
 
 namespace Octopuce\Acme;
 
+use Octopuce\Acme\Storage\StorageInterface;
 use Octopuce\Acme\Http\HttpClientInterface;
+use Octopuce\Acme\Ssl\SslInterface;
 use Octopuce\Acme\Exception\InvalidRegisterArgumentException;
 use Octopuce\Acme\Exception\AccountNotFoundException;
+use Octopuce\Acme\Exception\AccountNotLoadedException;
+use Octopuce\Acme\Exception\NoPublicKeyException;
+use Octopuce\Acme\Exception\NoPrivateKeyException;
+use Octopuce\Acme\Exception\ApiBadResponseException;
 
 class Account extends AbstractEntity implements StorableInterface, AccountInterface
 {
@@ -22,13 +28,19 @@ class Account extends AbstractEntity implements StorableInterface, AccountInterf
      * Contact
      * @var string
      */
-    private $contact;
+    private $mailto;
+
+    /**
+     * Tel
+     * @var string
+     */
+    private $tel;
 
     /**
      * Url
      * @var string
      */
-    private $url;
+    private $url = '';
 
     /**
      * Status
@@ -53,10 +65,8 @@ class Account extends AbstractEntity implements StorableInterface, AccountInterf
             throw new InvalidRegisterArgumentException('mailto cannot be empty !', 15);
         }
 
-        $this->contact = json_encode(array(
-            'mailto:'.$mailto,
-            'tel:'.$tel,
-        ));
+        $this->mailto = $mailto;
+        $this->tel    = $tel;
 
         // Save as pending
         // @fixme : what if api call raises an exception ? orphan row ?
@@ -65,6 +75,12 @@ class Account extends AbstractEntity implements StorableInterface, AccountInterf
 
         // Call api to register
         $response = $this->client->registerNewAccount($mailto, $tel, $this->getPrivateKey(), $this->getPublicKey());
+
+        $headers = $response->getHeaders();
+        if (!$headers->offsetExists('location')) {
+            throw new ApiBadResponseException('Response does not contain location header');
+        }
+        $this->url = (string) $headers->get('location');
 
         // Save to update status
         $this->status = self::STATUS_REGISTERED;
@@ -83,7 +99,7 @@ class Account extends AbstractEntity implements StorableInterface, AccountInterf
     /**
      * Load account from storage
      *
-     * @param int $id
+     * @param mixed $id
      *
      * @return $this
      *
@@ -92,23 +108,61 @@ class Account extends AbstractEntity implements StorableInterface, AccountInterf
      */
     public function load($id)
     {
-        $id = (int) $id;
-
-        if ($id === 0) {
+        if (empty($id)) {
             throw new \InvalidArgumentException('Empty id provided');
         }
 
         if (!$data = $this->storage->findById($id, 'account')) {
-            throw new AccountNotFoundException(sprintf('Account with id %d could not be found', $id));
+            throw new AccountNotFoundException(sprintf('Account with id %s could not be found', $id));
         }
 
         $this->id         = $id;
-        $this->contact    = $data['contact'];
+        $this->mailto     = $data['mailto'];
+        $this->tel        = $data['tel'];
         $this->url        = $data['url'];
         $this->status     = $data['status'];
         $this->setKeys($data['privatekey'], $data['publickey']);
 
         return $this;
+    }
+
+    /**
+     * Recover account from API
+     *
+     */
+    public function recover($id)
+    {
+
+        $this->client->recoverAccount($id);
+
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws AccountNotLoadedException
+     */
+    public function getPrivateKey()
+    {
+        try {
+            return parent::getPrivateKey();
+        } catch (NoPrivateKeyException $e) {
+            throw new AccountNotLoadedException('Account must either be defined in config or loaded prior usage');
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws AccountNotLoadedException
+     */
+    public function getPublicKey()
+    {
+        try {
+            return parent::getPublicKey();
+        } catch (NoPublicKeyException $e) {
+            throw new AccountNotLoadedException('Account must either be defined in config or loaded prior usage');
+        }
     }
 
     /**
@@ -120,13 +174,14 @@ class Account extends AbstractEntity implements StorableInterface, AccountInterf
     {
         return array(
             'id'         => $this->id,
+            'mailto'     => $this->mailto,
+            'tel'        => $this->tel,
             'created'    => $this->created,
             'modified'   => $this->modified,
-            'contact'    => $this->contact,
             'privatekey' => $this->getPrivateKey(),
             'publickey'  => $this->getPublicKey(),
             'contract'   => '',
-            'url'        => '',
+            'url'        => $this->url,
             'status'     => $this->status,
         );
     }

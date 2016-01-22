@@ -9,6 +9,11 @@ namespace Octopuce\Acme\ChallengeSolver;
 class Http implements SolverInterface
 {
     /**
+     * File path
+     */
+    const FILE_PATH = '/.well-known/acme-challenge/';
+
+    /**
      * Target path
      * @var string
      */
@@ -26,7 +31,7 @@ class Http implements SolverInterface
         if (!preg_match('#\.well-known.acme-challenge#', $this->targetPath)) {
 
             $this->targetPath = sprintf(
-                '%s%s.well-known%sacme-challenge%s',
+                '%s'.str_replace('/', '%s', self::FILE_PATH),
                 rtrim($this->targetPath, DIRECTORY_SEPARATOR),
                 DIRECTORY_SEPARATOR,
                 DIRECTORY_SEPARATOR,
@@ -57,6 +62,27 @@ class Http implements SolverInterface
         }
 
         return true;
+    }
+
+    /**
+     * Solve the challenge by placing a file in a web root folder
+     *
+     * @param string $fqdn
+     * @param string $token
+     * @param string $key
+     *
+     * @return array
+     *
+     * @throws \RuntimeException
+     */
+    public function getChallengeInfo($fqdn, $token, $key)
+    {
+        $targetUrl = 'http://'.$fqdn.self::FILE_PATH.$token;
+
+        return array(
+            'info' => sprintf('Put the keyAuthorization value in a file accessible at url %s', $targetUrl),
+            'keyAuthorization' => $token.'.'.$key,
+        );
     }
 
     /**
