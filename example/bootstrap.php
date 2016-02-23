@@ -1,64 +1,35 @@
 <?php
 
-/*
- * Bootstrap for acme-php-client example code
- * autoload the composer-required-classes & the acmephp classes
- * create a new instance of the client to be used later  
- */
+$autoload = require __DIR__.'/../vendor/autoload.php';
 
-namespace Octopuce\Acme\example;
+$config = require __DIR__.'/../src/config.php';
 
-// This contains MySQL access & API URL
-require_once("config.php");
+// Get client
+$client = new \Octopuce\Acme\Client($config);
 
-// Autoload of phpseclib & JWT/JWK 
-require_once("../vendor/autoload.php");
+// Make your calls !
 
-// in normal mode, the classes below would be loaded by using use Octopuce\Acme thanks to autoloader
-// no require_once should be necessary.
-// main Acme Library
-require_once("../Client.php");
+// Works but needed only if no default account in config
+// $client->newAccount('test107@sonntag.fr');
 
+// Works but needed only if no default account in config
+// $client->loadAccount('test107@sonntag.fr');
 
-require_once("../HttpClientInterface.php");
-require_once("../HttpClientCurl.php");
+// Works
+// $client->newOwnership('sonntag.fr');
 
-require_once("../SslInterface.php");
-require_once("../SslPhpseclib.php");
+// Works
+// $client->getChallengeData('sonntag.fr');
+// $client->getChallengeData('sonntag.fr', 'http-01'); /// Can override challenge type for each call
 
-require_once("../StorageInterface.php");
-require_once("../StoragePdo.php");
+// Works
+// $client->challengeOwnership('sonntag.fr');
 
-require_once("../ValidationPluginInterface.php");
-require_once("../ValidationApache.php");
+// Works
+// $client->signCertificate('sonntag.fr');
 
-require_once("../AcmeException.php");
+// Works
+// $client->getCertificate('sonntag.fr');
 
-use \Octopuce\Acme;
-
-// Create an instance of the Client Library, including its dependent classes: 
-// SimpleHTTP validation plugin 
-$validator = new Acme\ValidationApache();
-// HTTP Client (here using php5-curl module)
-$httpclient = new Acme\HttpClientCurl();
-// SSL Security library (here using phpseclib, since we need it anyway...)
-$ssl = new Acme\SslPhpseclib();
-
-// Connect to the MySQL DB
-try {
-    $storage = new Acme\StoragePdo($db_dsn, $db_user, $db_pass);
-} catch (PDOException $e) {
-    echo "Fatal error connecting to the database : " . $e->getMessage() . "\n";
-}
-
-try { // if we use the stock curl class, verbose allow for some debugging ;) while waiting for PSR-3 logging...
-    $httpclient->verbose = true;
-} catch (Exception $ex) {
-    
-}
-// And Instance the ACME PHP Client:
-$client = new Acme\Client($apiroot, $storage, $httpclient, null, $ssl);
-// and add simpleHTTP validation plugin
-$client->setPlugin($validator);
-
-
+// Works
+// $client->revokeCertificate('sonntag.fr');

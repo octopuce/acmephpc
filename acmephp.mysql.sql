@@ -6,8 +6,8 @@ SET TIME_ZONE='+00:00';
 SET character_set_client = utf8;
 
 -- ------------------------------------------------------
-DROP TABLE IF EXISTS `acme_authz`;
-CREATE TABLE `acme_authz` (
+DROP TABLE IF EXISTS `acme_ownership`;
+CREATE TABLE `acme_ownership` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `created` int(10) unsigned NOT NULL,
   `modified` int(10) unsigned NOT NULL,
@@ -40,12 +40,13 @@ CREATE TABLE `acme_cert` (
 
 
 -- ------------------------------------------------------
-DROP TABLE IF EXISTS `acme_contact`;
-CREATE TABLE `acme_contact` (
+DROP TABLE IF EXISTS `acme_account`;
+CREATE TABLE `acme_account` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `created` int(10) unsigned NOT NULL,
   `modified` int(10) unsigned NOT NULL,
-  `contact` text NOT NULL,
+  `mailto` varchar(255) NULL,
+  `tel` varchar(20) NULL,
   `privatekey` text NOT NULL,
   `publickey` text NOT NULL,
   `contract` text NOT NULL DEFAULT '',
